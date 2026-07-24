@@ -757,7 +757,7 @@ function AiTaskModal({
   )
 }
 
-function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, messages, draft, setDraft, onSend }) {
+function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, messages, draft, setDraft, onSend, onTyping, onReact, onEdit, onDelete, typingUsers, readState }) {
   const messagesEndRef = useRef(null)
 
   useEffect(() => {
@@ -794,18 +794,47 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
                   <small>
                     {isMine ? 'You' : message.userName ?? 'Teammate'}
                     <span>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    {message.editedAt && <span>edited</span>}
                   </small>
-                  <p>{message.text}</p>
+                  <p>{message.deletedAt ? 'This message was deleted.' : message.text}</p>
+                  {!message.deletedAt && (
+                    <div className="chat-message-actions">
+                      {['👍', '❤️', '🔥', '✅'].map((emoji) => {
+                        const count = (message.reactions ?? []).filter((reaction) => reaction.emoji === emoji).length
+                        return (
+                          <button key={emoji} type="button" onClick={() => onReact(message, emoji)}>
+                            {emoji}{count > 0 ? ` ${count}` : ''}
+                          </button>
+                        )
+                      })}
+                      {isMine && (
+                        <>
+                          <button type="button" onClick={() => onEdit(message)}>Edit</button>
+                          <button type="button" onClick={() => onDelete(message)}>Delete</button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {isMine && readState.readAt >= message.timestamp && <em>Seen</em>}
                 </div>
                 {isMine && <img src={avatarFor(currentUser?._id, selectedAvatarId)} alt={currentUser?.name ?? 'You'} />}
               </div>
             )
           })
         )}
+        {typingUsers.length > 0 && <div className="typing-indicator">{typingUsers.map((user) => user.userName).join(', ')} typing...</div>}
         <div ref={messagesEndRef} />
       </div>
       <form className="chat-compose" onSubmit={onSend}>
-        <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message this board..." />
+        <input
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value)
+            onTyping(Boolean(event.target.value.trim()))
+          }}
+          onBlur={() => onTyping(false)}
+          placeholder="Message this board..."
+        />
         <button disabled={!draft.trim()}>
           <Send size={16} />
         </button>
@@ -837,6 +866,8 @@ export function SwiftWorkspace() {
   const [chatMessages, setChatMessages] = useState([])
   const [chatDraft, setChatDraft] = useState('')
   const [chatUnread, setChatUnread] = useState(0)
+  const [chatTypingUsers, setChatTypingUsers] = useState([])
+  const [chatReadState, setChatReadState] = useState({})
   const [inboxOpen, setInboxOpen] = useState(false)
   const [inboxEntries, setInboxEntries] = useState([])
   const [aiText, setAiText] = useState('')
@@ -880,6 +911,8 @@ export function SwiftWorkspace() {
   useEffect(() => {
     setChatMessages([])
     setChatUnread(0)
+    setChatTypingUsers([])
+    setChatReadState({})
     setChatOpen(false)
   }, [currentBoardId])
 
@@ -892,6 +925,10 @@ export function SwiftWorkspace() {
       .then((messages) => {
         setChatMessages(Array.isArray(messages) ? messages : [])
         setChatUnread(0)
+        fetch(`/api/boards/${currentBoardId}/chat/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {})
       })
       .catch(() => setChatMessages([]))
   }, [chatOpen, currentBoardId, token])
@@ -911,6 +948,40 @@ export function SwiftWorkspace() {
     window.addEventListener('flowboard:chat-message', handleChatMessage)
     return () => window.removeEventListener('flowboard:chat-message', handleChatMessage)
   }, [chatOpen, currentBoardId])
+
+  useEffect(() => {
+    const updateMessage = (message) => {
+      if (!message || message.boardId !== currentBoardId) return
+      setChatMessages((items) => items.map((item) => (String(item._id) === String(message._id) ? message : item)))
+    }
+    const handleChatUpdate = (event) => updateMessage(event.detail)
+    const handleTyping = (event) => {
+      const detail = event.detail
+      if (!detail || detail.boardId !== currentBoardId || detail.userId === currentUser?._id) return
+      setChatTypingUsers((users) => {
+        const withoutUser = users.filter((user) => user.userId !== detail.userId)
+        return detail.isTyping ? [...withoutUser, detail] : withoutUser
+      })
+      if (detail.isTyping) {
+        window.setTimeout(() => {
+          setChatTypingUsers((users) => users.filter((user) => user.userId !== detail.userId))
+        }, 3500)
+      }
+    }
+    const handleRead = (event) => {
+      const detail = event.detail
+      if (!detail || detail.boardId !== currentBoardId || detail.userId === currentUser?._id) return
+      setChatReadState((state) => ({ ...state, [detail.userId]: { readAt: detail.readAt } }))
+    }
+    window.addEventListener('flowboard:chat-message-update', handleChatUpdate)
+    window.addEventListener('flowboard:chat-typing', handleTyping)
+    window.addEventListener('flowboard:chat-read', handleRead)
+    return () => {
+      window.removeEventListener('flowboard:chat-message-update', handleChatUpdate)
+      window.removeEventListener('flowboard:chat-typing', handleTyping)
+      window.removeEventListener('flowboard:chat-read', handleRead)
+    }
+  }, [currentBoardId, currentUser?._id])
 
   useEffect(() => {
     if (!token || !inboxOpen) return
@@ -1194,10 +1265,28 @@ export function SwiftWorkspace() {
     setBoardMembers((members) => members.filter((member) => member._id !== userId))
   }
 
+  const changeMemberRole = async (userId, role) => {
+    const response = await fetch(`/api/boards/${currentBoardId}/members/${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ role }),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setInviteStatus({ type: 'error', text: result.error ?? 'Could not change role' })
+      return
+    }
+    setBoardMembers((members) => members.map((member) => (member._id === userId ? { ...member, role: role === 'viewer' ? 'Viewer' : 'Editor' } : member)))
+  }
+
   const sendChatMessage = async (event) => {
     event.preventDefault()
     const text = chatDraft.trim()
     if (!text || !currentBoardId) return
+    dispatch({ type: 'chat/typing', payload: { isTyping: false } })
     setChatDraft('')
     try {
       const response = await fetch(`/api/boards/${currentBoardId}/chat`, {
@@ -1216,6 +1305,67 @@ export function SwiftWorkspace() {
       })
     } catch (error) {
       setChatDraft(text)
+      window.alert(error.message)
+    }
+  }
+
+  const sendTyping = (isTyping) => {
+    dispatch({ type: 'chat/typing', payload: { isTyping } })
+  }
+
+  const updateChatMessage = async (message, changes) => {
+    const response = await fetch(`/api/boards/${currentBoardId}/chat/${message._id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(changes),
+    })
+    const updated = await response.json()
+    if (!response.ok) throw new Error(updated.error ?? 'Message update failed')
+    setChatMessages((items) => items.map((item) => (String(item._id) === String(updated._id) ? updated : item)))
+  }
+
+  const editChatMessage = async (message) => {
+    const text = window.prompt('Edit message', message.text)
+    if (!text?.trim() || text.trim() === message.text) return
+    try {
+      await updateChatMessage(message, { text: text.trim() })
+    } catch (error) {
+      window.alert(error.message)
+    }
+  }
+
+  const deleteChatMessage = async (message) => {
+    if (!window.confirm('Delete this message?')) return
+    try {
+      const response = await fetch(`/api/boards/${currentBoardId}/chat/${message._id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const updated = await response.json()
+      if (!response.ok) throw new Error(updated.error ?? 'Message delete failed')
+      setChatMessages((items) => items.map((item) => (String(item._id) === String(updated._id) ? updated : item)))
+    } catch (error) {
+      window.alert(error.message)
+    }
+  }
+
+  const reactToChatMessage = async (message, emoji) => {
+    try {
+      const response = await fetch(`/api/boards/${currentBoardId}/chat/${message._id}/reactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ emoji }),
+      })
+      const updated = await response.json()
+      if (!response.ok) throw new Error(updated.error ?? 'Reaction failed')
+      setChatMessages((items) => items.map((item) => (String(item._id) === String(updated._id) ? updated : item)))
+    } catch (error) {
       window.alert(error.message)
     }
   }
@@ -1495,7 +1645,13 @@ export function SwiftWorkspace() {
                   <small className={isLive ? 'live-text' : 'offline-text'}>{member.role ?? (isCurrent ? 'Owner' : 'Collaborator')} - {isLive ? 'Live now' : 'Offline'}</small>
                 </div>
                 {canRemove ? (
-                  <button className="delete-btn" onClick={() => removeCollaborator(member._id)}>Remove</button>
+                  <div className="member-actions">
+                    <select value={member.role === 'Viewer' ? 'viewer' : 'editor'} onChange={(event) => changeMemberRole(member._id, event.target.value)}>
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <button className="delete-btn" onClick={() => removeCollaborator(member._id)}>Remove</button>
+                  </div>
                 ) : (
                   <UserCheck size={18} style={{ color: 'var(--accent)' }} />
                 )}
@@ -1570,6 +1726,12 @@ export function SwiftWorkspace() {
         draft={chatDraft}
         setDraft={setChatDraft}
         onSend={sendChatMessage}
+        onTyping={sendTyping}
+        onReact={reactToChatMessage}
+        onEdit={editChatMessage}
+        onDelete={deleteChatMessage}
+        typingUsers={chatTypingUsers}
+        readState={Object.values(chatReadState).sort((a, b) => b.readAt - a.readAt)[0] ?? {}}
       />
       <CardModal isOpen={isModalOpen} onClose={closeModal} task={modalTask} columnId={modalColumnId ?? columns[0]?.id} onSave={saveTask} onDelete={deleteTask} currentUser={currentUser} />
       <BoardNameModal isOpen={isBoardModalOpen} title={newBoardTitle} setTitle={setNewBoardTitle} onClose={() => setIsBoardModalOpen(false)} onCreate={confirmCreateBoard} />

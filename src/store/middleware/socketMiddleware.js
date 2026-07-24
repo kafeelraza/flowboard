@@ -79,6 +79,18 @@ export const createSocketMiddleware = () => (store) => {
     socket.on('chat:message', (message) => {
       window.dispatchEvent(new CustomEvent('flowboard:chat-message', { detail: message }))
     })
+
+    socket.on('chat:message:update', (message) => {
+      window.dispatchEvent(new CustomEvent('flowboard:chat-message-update', { detail: message }))
+    })
+
+    socket.on('chat:typing', (event) => {
+      window.dispatchEvent(new CustomEvent('flowboard:chat-typing', { detail: event }))
+    })
+
+    socket.on('chat:read', (event) => {
+      window.dispatchEvent(new CustomEvent('flowboard:chat-read', { detail: event }))
+    })
   }
 
   return (next) => (action) => {
@@ -137,6 +149,15 @@ export const createSocketMiddleware = () => (store) => {
       socket.emit('presence:editing:stop', {
         boardId: store.getState().board.currentBoardId,
         taskId: action.payload.taskId,
+      })
+    }
+
+    if (action.type === 'chat/typing' && socket?.connected) {
+      if (!store.getState().user.currentUser?._id || !store.getState().board.currentBoardId) return result
+      joinCurrentBoard()
+      socket.emit('chat:typing', {
+        boardId: store.getState().board.currentBoardId,
+        isTyping: action.payload?.isTyping,
       })
     }
 

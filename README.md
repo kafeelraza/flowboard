@@ -1,50 +1,78 @@
 # FlowBoard
 
-Collaborative Kanban board built to demonstrate advanced Redux Toolkit patterns:
-undo/redo history, realtime socket sync, AI-assisted task creation, offline queueing,
-and Mongo-backed persistence when configured.
+FlowBoard is a realtime collaborative Kanban workspace with MongoDB persistence, Socket.io sync, board chat, AI-assisted task creation, and AI subtask breakdown.
 
-## Run
+## Live Services
+
+- Frontend: https://flowboard-plum.vercel.app
+- Backend / Realtime API: https://flowboard-realtime-api.onrender.com
+
+Render free instances can sleep after inactivity, so the first API or websocket connection may take 30-50 seconds.
+
+## Features
+
+- Auth: signup/login with JWT
+- Boards: create, switch, delete
+- Tasks: create, edit, delete, drag between columns
+- Views: Kanban board, list, calendar
+- AI: natural-language task creation and subtask breakdown
+- Collaboration: online members, live editing badges, realtime task sync
+- Chat: board-level chat with typing indicator, read signal, reactions, edit/delete for own messages
+- Permissions: owner, editor, viewer roles
+- Analytics: completion, priority split, overdue count, workflow distribution
+- Persistence: MongoDB Atlas snapshots plus local offline fallback queue
+- Deployment: Vercel frontend, Render backend, GitHub auto-deploy
+
+## Environment
+
+Create `.env` locally:
+
+```env
+MONGO_URI=mongodb+srv://<user>:<password>@<cluster>/<db>?retryWrites=true&w=majority
+GROQ_API_KEY=your_groq_key
+GROQ_MODEL=llama-3.3-70b-versatile
+JWT_SECRET=replace_with_a_long_random_secret
+FRONTEND_ORIGINS=http://127.0.0.1:5174,http://localhost:5174,https://flowboard-plum.vercel.app
+```
+
+For Vercel:
+
+```env
+VITE_REALTIME_URL=https://flowboard-realtime-api.onrender.com
+```
+
+## Local Run
 
 ```bash
 npm install
-npm run mongo:start
 npm run server
 npm run dev
 ```
 
-Frontend runs on `http://127.0.0.1:5174`.
-Backend runs on `http://127.0.0.1:4000`.
+Frontend: `http://127.0.0.1:5174`
+Backend: `http://127.0.0.1:4000`
 
-## Environment
+## Verification Checklist
 
-Copy `.env.example` to `.env` and fill values:
-
-```env
-GROQ_API_KEY=your_groq_key
-GROQ_MODEL=llama-3.3-70b-versatile
-MONGO_URI=mongodb://127.0.0.1:27017/flowboard
-JWT_SECRET=replace_this_with_a_long_random_secret
-```
-
-If MongoDB is not running, the server falls back to in-memory persistence.
-If Groq is not configured, AI endpoints fall back to deterministic heuristics.
-
-Local Mongo data is stored in `mongo-data/` and logs in `mongo-log/`.
-
-## Demo Script
-
-1. Open two browser windows at `http://127.0.0.1:5174`.
-2. Move a card and watch the second window sync.
-3. Open a task and confirm the remote editing badge.
-4. Use Undo/Redo and the History panel jump.
-5. Type `Fix navbar bug by Friday, high priority` in Quick Add and confirm the AI draft.
-6. Open a task and use `Break down with AI`.
-7. Turn off network briefly, make a board change, reconnect, and let the offline queue flush.
+1. Sign up two users in two browsers.
+2. Invite the second user to the same board.
+3. Move a task in browser A and confirm browser B updates.
+4. Open a task in browser A and confirm the editing badge in browser B.
+5. Send a chat message and confirm realtime delivery.
+6. Test typing indicator, reactions, edit/delete message.
+7. Change collaborator role to Viewer and confirm board edits are blocked.
+8. Resize to small laptop/mobile widths and check board, chat, and member screens.
 
 ## Key Files
 
-- `src/store/middleware/historyMiddleware.js` - undo/redo and timeline jump
-- `src/store/middleware/socketMiddleware.js` - realtime action/presence sync
-- `src/store/middleware/persistMiddleware.js` - backend save + offline queue
-- `server/index.js` - Express, Socket.io, Mongo/JWT, Groq endpoints
+- `server/index.js` - Express API, MongoDB models, auth, Socket.io, AI endpoints
+- `src/components/Swift/SwiftWorkspace.jsx` - main app UI
+- `src/store/middleware/socketMiddleware.js` - realtime sync bridge
+- `src/store/middleware/persistMiddleware.js` - Mongo persistence and offline queue
+- `src/store/middleware/historyMiddleware.js` - undo/redo timeline
+
+## Deployment Notes
+
+- Vercel deploys the frontend from `main`.
+- Render deploys the backend from `render.yaml`.
+- Keep secrets only in Vercel/Render environment variables, not in Git.

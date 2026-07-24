@@ -31,6 +31,23 @@ const memory = {
   activity: [],
   chatMessages: [],
 }
+const rateBuckets = new Map()
+
+const rateLimit = ({ windowMs = 60_000, max = 120 } = {}) => (req, res, next) => {
+  const key = `${req.ip}:${req.path}`
+  const now = Date.now()
+  const bucket = rateBuckets.get(key) ?? { resetAt: now + windowMs, count: 0 }
+  if (now > bucket.resetAt) {
+    bucket.resetAt = now + windowMs
+    bucket.count = 0
+  }
+  bucket.count += 1
+  rateBuckets.set(key, bucket)
+  if (bucket.count > max) return res.status(429).json({ error: 'Too many requests. Please wait a moment.' })
+  next()
+}
+
+const trimString = (value, max = 400) => String(value ?? '').trim().slice(0, max)
 
 const visiblePresenceForBoard = (boardId) => {
   const usersById = new Map()
@@ -93,6 +110,10 @@ const chatMessageSchema = new mongoose.Schema(
     userName: String,
     userEmail: String,
     text: String,
+    editedAt: Number,
+    deletedAt: Number,
+    reactions: [{ emoji: String, userId: String }],
+    readBy: [{ userId: String, readAt: Number }],
     timestamp: Number,
   },
   { timestamps: true },
@@ -138,6 +159,17 @@ function canAccessSnapshot(snapshot, userId) {
   return snapshotMemberIds(snapshot).includes(String(userId))
 }
 
+function boardRole(snapshot, userId) {
+  if (!snapshot || !userId) return null
+  if (String(snapshot.ownerId) === String(userId)) return 'owner'
+  const roles = snapshot?.state?.board?.boardsById?.[snapshot.boardId]?.memberRoles ?? {}
+  return roles[userId] ?? (snapshotMemberIds(snapshot).includes(String(userId)) ? 'editor' : null)
+}
+
+function canEditBoard(snapshot, userId) {
+  return ['owner', 'editor'].includes(boardRole(snapshot, userId))
+}
+
 async function requireBoardAccess(boardId, userId) {
   const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
   if (!snapshot) return { error: { status: 404, message: 'Board not found' } }
@@ -164,6 +196,7 @@ async function normalizeSnapshotOwnership(snapshot, userId) {
   if (board) {
     board.ownerId = String(userId)
     board.members = members
+    board.memberRoles = { ...(board.memberRoles ?? {}), [String(userId)]: 'owner' }
   }
 
   snapshot.ownerId = String(userId)
@@ -229,8 +262,14 @@ async function callGroq(systemPrompt, userPrompt) {
   return JSON.parse(text.replace(/```json|```/g, '').trim())
 }
 
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  next()
+})
 app.use(cors({ origin: allowedOrigins }))
-app.use(express.json())
+app.use(express.json({ limit: '256kb' }))
 app.use(authOptional)
 
 app.get('/api/health', (_req, res) => {
@@ -243,9 +282,13 @@ app.get('/api/health', (_req, res) => {
   })
 })
 
-app.post('/api/auth/signup', async (req, res) => {
-  const { name = 'FlowBoard User', email, password } = req.body
+app.post('/api/auth/signup', rateLimit({ max: 12 }), async (req, res) => {
+  const name = trimString(req.body.name || 'FlowBoard User', 80)
+  const email = trimString(req.body.email, 160).toLowerCase()
+  const password = String(req.body.password ?? '')
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'A valid email is required' })
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
 
   const avatarColor = ['#2563eb', '#16a34a', '#f59e0b', '#7c3aed'][Math.floor(Math.random() * 4)]
   const passwordHash = await bcrypt.hash(password, 10)
@@ -265,8 +308,9 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 })
 
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body
+app.post('/api/auth/login', rateLimit({ max: 20 }), async (req, res) => {
+  const email = trimString(req.body.email, 160).toLowerCase()
+  const password = String(req.body.password ?? '')
   const user = mongoReady ? await User.findOne({ email }) : memory.users.get(email)
   if (!user) return res.status(401).json({ error: 'Invalid credentials' })
   const ok = await bcrypt.compare(password, user.passwordHash)
@@ -298,11 +342,19 @@ app.put('/api/boards/:boardId/state', async (req, res) => {
   if (existing && req.auth?.sub && !canAccessSnapshot(existing, req.auth.sub)) {
     return res.status(403).json({ error: 'You do not have access to this board' })
   }
+  if (existing && req.auth?.sub && !canEditBoard(existing, req.auth.sub)) {
+    return res.status(403).json({ error: 'Viewer access cannot modify this board' })
+  }
   const effectiveOwnerId = existing?.ownerId ?? ownerId
   const members = [...new Set([effectiveOwnerId, ...(state?.board?.boardsById?.[boardId]?.members ?? existing?.members ?? [ownerId])].filter(Boolean).map(String))]
   if (state?.board?.boardsById?.[boardId]) {
     state.board.boardsById[boardId].ownerId = effectiveOwnerId
     state.board.boardsById[boardId].members = members
+    state.board.boardsById[boardId].memberRoles = {
+      ...(existing?.state?.board?.boardsById?.[boardId]?.memberRoles ?? {}),
+      ...(state.board.boardsById[boardId].memberRoles ?? {}),
+      [effectiveOwnerId]: 'owner',
+    }
   }
 
   if (mongoReady) {
@@ -347,7 +399,8 @@ app.delete('/api/boards/:boardId', async (req, res) => {
 app.post('/api/boards/:boardId/invite', async (req, res) => {
   if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
   const { boardId } = req.params
-  const email = String(req.body.email ?? '').trim().toLowerCase()
+  const email = trimString(req.body.email, 160).toLowerCase()
+  const role = ['viewer', 'editor'].includes(req.body.role) ? req.body.role : 'editor'
   if (!email) return res.status(400).json({ error: 'Email is required' })
 
   let snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
@@ -356,6 +409,7 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
     snapshot = await normalizeSnapshotOwnership(snapshot, req.auth.sub)
   }
   if (!canAccessSnapshot(snapshot, req.auth.sub)) return res.status(403).json({ error: 'You do not have access to this board' })
+  if (boardRole(snapshot, req.auth.sub) !== 'owner') return res.status(403).json({ error: 'Only the owner can invite collaborators' })
 
   const user = mongoReady ? await User.findOne({ email }) : memory.users.get(email)
   if (!user) return res.status(404).json({ error: 'User must sign up before they can be invited' })
@@ -366,6 +420,7 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
   const board = state?.board?.boardsById?.[boardId]
   if (board) {
     board.members = members
+    board.memberRoles = { ...(board.memberRoles ?? {}), [snapshot.ownerId]: 'owner', [invitedUser._id]: role }
   }
 
   if (mongoReady) {
@@ -393,7 +448,7 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
     })
   }
 
-  res.json({ ok: true, invitedUser, ownerId: snapshot.ownerId, members })
+  res.json({ ok: true, invitedUser, ownerId: snapshot.ownerId, members, role })
 })
 
 app.get('/api/boards/:boardId/members', async (req, res) => {
@@ -407,10 +462,31 @@ app.get('/api/boards/:boardId/members', async (req, res) => {
   if (!canAccessSnapshot(snapshot, req.auth.sub)) return res.status(403).json({ error: 'You do not have access to this board' })
 
   const members = await publicUsersByIds(snapshotMemberIds(snapshot))
+  const roles = snapshot?.state?.board?.boardsById?.[boardId]?.memberRoles ?? {}
   res.json({
     ownerId: snapshot.ownerId,
-    members: members.map((user) => ({ ...user, role: String(user._id) === String(snapshot.ownerId) ? 'Owner' : 'Collaborator' })),
+    members: members.map((user) => ({ ...user, role: String(user._id) === String(snapshot.ownerId) ? 'Owner' : roles[user._id] === 'viewer' ? 'Viewer' : 'Editor' })),
   })
+})
+
+app.patch('/api/boards/:boardId/members/:userId', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId, userId } = req.params
+  const role = ['viewer', 'editor'].includes(req.body.role) ? req.body.role : null
+  if (!role) return res.status(400).json({ error: 'Role must be viewer or editor' })
+  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (String(snapshot.ownerId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the owner can change roles' })
+  if (String(snapshot.ownerId) === String(userId)) return res.status(400).json({ error: 'Owner role cannot be changed' })
+
+  const state = snapshot.state
+  const board = state?.board?.boardsById?.[boardId]
+  if (board) {
+    board.memberRoles = { ...(board.memberRoles ?? {}), [snapshot.ownerId]: 'owner', [userId]: role }
+  }
+  if (mongoReady) await BoardSnapshot.findOneAndUpdate({ boardId }, { state }, { new: true })
+  else memory.snapshots.set(boardId, { ...snapshot, state })
+  res.json({ ok: true, userId, role })
 })
 
 app.delete('/api/boards/:boardId/members/:userId', async (req, res) => {
@@ -424,7 +500,10 @@ app.delete('/api/boards/:boardId/members/:userId', async (req, res) => {
   const members = snapshotMemberIds(snapshot).filter((id) => id !== String(userId))
   const state = snapshot.state
   const board = state?.board?.boardsById?.[boardId]
-  if (board) board.members = members
+  if (board) {
+    board.members = members
+    if (board.memberRoles) delete board.memberRoles[userId]
+  }
 
   if (mongoReady) {
     await BoardSnapshot.findOneAndUpdate({ boardId }, { members, state }, { new: true })
@@ -471,7 +550,7 @@ app.get('/api/boards/:boardId/chat', async (req, res) => {
   res.json(memory.chatMessages.filter((message) => message.boardId === boardId).slice(-80))
 })
 
-app.post('/api/boards/:boardId/chat', async (req, res) => {
+app.post('/api/boards/:boardId/chat', rateLimit({ max: 80 }), async (req, res) => {
   if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
   const { boardId } = req.params
   const text = String(req.body.text ?? '').trim()
@@ -486,6 +565,8 @@ app.post('/api/boards/:boardId/chat', async (req, res) => {
     userName: req.body.userName ?? req.auth.email ?? 'Teammate',
     userEmail: req.auth.email,
     text: text.slice(0, 1200),
+    reactions: [],
+    readBy: [{ userId: req.auth.sub, readAt: Date.now() }],
     timestamp: Date.now(),
   }
 
@@ -501,6 +582,101 @@ app.post('/api/boards/:boardId/chat', async (req, res) => {
   const publicMessage = saved.toObject?.() ?? saved
   io.to(boardId).emit('chat:message', publicMessage)
   res.json(publicMessage)
+})
+
+app.patch('/api/boards/:boardId/chat/:messageId', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId, messageId } = req.params
+  const text = trimString(req.body.text, 1200)
+  if (!text) return res.status(400).json({ error: 'Message text is required' })
+  const { error } = await requireBoardAccess(boardId, req.auth.sub)
+  if (error) return res.status(error.status).json({ error: error.message })
+
+  let message
+  if (mongoReady) {
+    message = await ChatMessage.findOne({ _id: messageId, boardId })
+    if (!message) return res.status(404).json({ error: 'Message not found' })
+    if (String(message.userId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the sender can edit this message' })
+    message.text = text
+    message.editedAt = Date.now()
+    await message.save()
+  } else {
+    message = memory.chatMessages.find((item) => String(item._id) === String(messageId) && item.boardId === boardId)
+    if (!message) return res.status(404).json({ error: 'Message not found' })
+    if (String(message.userId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the sender can edit this message' })
+    message.text = text
+    message.editedAt = Date.now()
+  }
+  const publicMessage = message.toObject?.() ?? message
+  io.to(boardId).emit('chat:message:update', publicMessage)
+  res.json(publicMessage)
+})
+
+app.delete('/api/boards/:boardId/chat/:messageId', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId, messageId } = req.params
+  const { error } = await requireBoardAccess(boardId, req.auth.sub)
+  if (error) return res.status(error.status).json({ error: error.message })
+
+  let message
+  if (mongoReady) {
+    message = await ChatMessage.findOne({ _id: messageId, boardId })
+    if (!message) return res.status(404).json({ error: 'Message not found' })
+    if (String(message.userId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the sender can delete this message' })
+    message.deletedAt = Date.now()
+    message.text = ''
+    await message.save()
+  } else {
+    message = memory.chatMessages.find((item) => String(item._id) === String(messageId) && item.boardId === boardId)
+    if (!message) return res.status(404).json({ error: 'Message not found' })
+    if (String(message.userId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the sender can delete this message' })
+    message.deletedAt = Date.now()
+    message.text = ''
+  }
+  const publicMessage = message.toObject?.() ?? message
+  io.to(boardId).emit('chat:message:update', publicMessage)
+  res.json(publicMessage)
+})
+
+app.post('/api/boards/:boardId/chat/:messageId/reactions', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId, messageId } = req.params
+  const emoji = ['👍', '❤️', '🔥', '✅'].includes(req.body.emoji) ? req.body.emoji : null
+  if (!emoji) return res.status(400).json({ error: 'Unsupported reaction' })
+  const { error } = await requireBoardAccess(boardId, req.auth.sub)
+  if (error) return res.status(error.status).json({ error: error.message })
+
+  let message
+  if (mongoReady) {
+    message = await ChatMessage.findOne({ _id: messageId, boardId })
+    if (!message) return res.status(404).json({ error: 'Message not found' })
+    const existing = message.reactions.find((reaction) => reaction.userId === req.auth.sub && reaction.emoji === emoji)
+    message.reactions = existing
+      ? message.reactions.filter((reaction) => !(reaction.userId === req.auth.sub && reaction.emoji === emoji))
+      : [...message.reactions.filter((reaction) => reaction.userId !== req.auth.sub), { emoji, userId: req.auth.sub }]
+    await message.save()
+  } else {
+    message = memory.chatMessages.find((item) => String(item._id) === String(messageId) && item.boardId === boardId)
+    if (!message) return res.status(404).json({ error: 'Message not found' })
+    message.reactions ??= []
+    const existing = message.reactions.find((reaction) => reaction.userId === req.auth.sub && reaction.emoji === emoji)
+    message.reactions = existing
+      ? message.reactions.filter((reaction) => !(reaction.userId === req.auth.sub && reaction.emoji === emoji))
+      : [...message.reactions.filter((reaction) => reaction.userId !== req.auth.sub), { emoji, userId: req.auth.sub }]
+  }
+  const publicMessage = message.toObject?.() ?? message
+  io.to(boardId).emit('chat:message:update', publicMessage)
+  res.json(publicMessage)
+})
+
+app.post('/api/boards/:boardId/chat/read', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId } = req.params
+  const { error } = await requireBoardAccess(boardId, req.auth.sub)
+  if (error) return res.status(error.status).json({ error: error.message })
+  const readAt = Date.now()
+  io.to(boardId).emit('chat:read', { boardId, userId: req.auth.sub, readAt })
+  res.json({ ok: true, readAt })
 })
 
 app.post('/api/ai/breakdown', async (req, res) => {
@@ -622,6 +798,16 @@ io.on('connection', (socket) => {
       if (editing.size === 0) boardEditing.delete(boardId)
     }
     socket.to(boardId).emit('presence:editing', { taskId, userId: activeUser.userId, isEditing: false })
+  })
+
+  socket.on('chat:typing', ({ boardId, isTyping }) => {
+    if (!activeUser) return
+    socket.to(boardId).emit('chat:typing', {
+      boardId,
+      userId: activeUser.userId,
+      userName: activeUser.name,
+      isTyping: Boolean(isTyping),
+    })
   })
 
   socket.on('disconnect', () => {
