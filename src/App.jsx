@@ -49,6 +49,25 @@ export default function App() {
           rememberRemoteSnapshot(remote)
           dispatch({ ...boardActions.hydrateBoardState(remote.board), meta: { skipPersist: true } })
           dispatch({ ...taskActions.hydrateTasksState(remote.tasks), meta: { skipPersist: true } })
+        } else {
+          const boardsResponse = await fetch('/api/boards', {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          })
+          const boards = await boardsResponse.json()
+          const nextBoardId = boards?.[0]?.boardId
+          if (nextBoardId) {
+            const nextResponse = await fetch(`/api/boards/${nextBoardId}/state`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
+            const nextRemote = await nextResponse.json()
+            if (nextRemote?.board && nextRemote?.tasks) {
+              dispatch({ ...boardActions.hydrateBoardState(nextRemote.board), meta: { skipPersist: true } })
+              dispatch({ ...taskActions.hydrateTasksState(nextRemote.tasks), meta: { skipPersist: true } })
+            }
+          } else {
+            dispatch({ ...boardActions.clearBoards(), meta: { skipPersist: true } })
+            dispatch({ ...taskActions.clearTasks(), meta: { skipPersist: true } })
+          }
         }
       } catch {
         // Local snapshot already keeps the app usable offline.

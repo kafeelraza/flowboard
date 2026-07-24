@@ -16,7 +16,6 @@ export function TopBar() {
   const activeView = useSelector((state) => state.ui.activeView)
   const token = useSelector((state) => state.user.token)
   const currentUser = useSelector((state) => state.user.currentUser)
-  const boardCount = useSelector((state) => Object.keys(state.board.boardsById).length)
   const [boardsOpen, setBoardsOpen] = useState(false)
   const [boards, setBoards] = useState([])
   const canDeleteCurrentBoard = board?.ownerId === currentUser?._id
@@ -90,7 +89,7 @@ export function TopBar() {
                   </button>
                 ))
               )}
-              {canDeleteCurrentBoard && boardCount > 1 && (
+              {canDeleteCurrentBoard && (
                 <button className="danger-text" onClick={deleteCurrentBoard}>
                   Delete current board
                 </button>

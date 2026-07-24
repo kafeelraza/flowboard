@@ -13,6 +13,12 @@ const boardSlice = createSlice({
       state.columnsById = incoming.columnsById
       state.columnOrder = incoming.columnOrder
     },
+    clearBoards: (state) => {
+      state.currentBoardId = null
+      state.boardsById = {}
+      state.columnsById = {}
+      state.columnOrder = []
+    },
     createBoard: (state, action) => {
       const { board, columns } = action.payload
       state.boardsById[board._id] = board

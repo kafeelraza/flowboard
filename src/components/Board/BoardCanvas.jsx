@@ -58,6 +58,22 @@ export function BoardCanvas() {
     dispatch(uiActions.setActiveView('board'))
   }
 
+  if (!board) {
+    return (
+      <section className="board-canvas empty-board-canvas" aria-label="Board canvas">
+        <div className="workspace-panel-card">
+          <Plus size={28} />
+          <span>Projects / FlowBoard</span>
+          <h1>No boards yet</h1>
+          <p>Create a board to start planning tasks with collaborators.</p>
+          <button className="toolbar-button primary" onClick={createNewBoard}>
+            <Plus size={16} /> New Board
+          </button>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="board-canvas" aria-label="Board canvas">
       <div className="board-dashboard-header">

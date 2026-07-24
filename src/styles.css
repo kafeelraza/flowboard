@@ -709,6 +709,12 @@ button:disabled {
   background: #f8fafc;
 }
 
+.empty-board-canvas {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
 .board-dashboard-header {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) auto auto;

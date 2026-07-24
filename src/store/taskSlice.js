@@ -13,6 +13,7 @@ const taskSlice = createSlice({
     hydrateTasksState: (state, action) => {
       tasksAdapter.setAll(state, Object.values(action.payload.entities ?? {}))
     },
+    clearTasks: tasksAdapter.removeAll,
     addTask: tasksAdapter.addOne,
     deleteTasksByBoard: (state, action) => {
       const boardId = action.payload
