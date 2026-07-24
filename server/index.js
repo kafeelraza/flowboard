@@ -233,7 +233,7 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
 
   const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
   if (!snapshot) return res.status(404).json({ error: 'Board not found' })
-  if (String(snapshot.ownerId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the owner can invite collaborators' })
+  if (!canAccessSnapshot(snapshot, req.auth.sub)) return res.status(403).json({ error: 'You do not have access to this board' })
 
   const user = mongoReady ? await User.findOne({ email }) : memory.users.get(email)
   if (!user) return res.status(404).json({ error: 'User must sign up before they can be invited' })

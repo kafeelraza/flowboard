@@ -67,7 +67,7 @@ export function WorkspacePanel() {
     .slice(0, 8)
   const labels = [...new Map(tasks.flatMap((task) => task.labels).map((label) => [label.text, label])).values()]
   const highPriorityCount = tasks.filter((task) => task.priority === 'high').length
-  const isBoardOwner = board?.ownerId === currentUser?._id
+  const canInviteToBoard = Boolean(currentUser?._id && board)
 
   const handleAction = () => {
     if (config.tab) {
@@ -133,7 +133,7 @@ export function WorkspacePanel() {
     if (activeSidebarItem === 'Collaborators') {
       return (
         <div className="collaborator-grid">
-          {isBoardOwner && (
+          {canInviteToBoard && (
             <form className="invite-form" onSubmit={inviteCollaborator}>
               <input
                 value={inviteEmail}
@@ -147,7 +147,7 @@ export function WorkspacePanel() {
               {inviteStatus && <span className={`invite-status ${inviteStatus.type}`}>{inviteStatus.text}</span>}
             </form>
           )}
-          {!isBoardOwner && <p className="empty-text">Only the board owner can invite more collaborators.</p>}
+          {!canInviteToBoard && <p className="empty-text">Open a board before inviting collaborators.</p>}
           {users.map((user) => (
             <div key={user.userId} className="collaborator-row">
               <Avatar name={user.name} color={user.avatarColor} size={30} />
