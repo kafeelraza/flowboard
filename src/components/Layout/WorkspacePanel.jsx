@@ -234,13 +234,15 @@ export function WorkspacePanel() {
           {membersStatus === 'loading' && <p className="empty-text">Loading collaborators...</p>}
           {boardMembers.map((member) => {
             const liveUser = users.find((user) => user.userId === member._id)
+            const isCurrentMember = member._id === currentUser?._id
+            const isLive = isCurrentMember || Boolean(liveUser)
             return (
               <div key={member._id} className="collaborator-row">
                 <Avatar name={member.name} color={member.avatarColor} size={30} />
                 <div>
                   <strong>{member.name}</strong>
                   <span>{member.email}</span>
-                  <small>{member.role} · {liveUser ? 'Live now' : 'Offline'}</small>
+                  <small>{member.role} - {isLive ? 'Live now' : 'Offline'}</small>
                 </div>
                 {isBoardOwner && member._id !== currentUser?._id && (
                   <button className="text-danger-button" onClick={() => removeCollaborator(member._id)}>

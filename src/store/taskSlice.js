@@ -1,5 +1,4 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit'
-import { taskSeed } from '../data/seed.js'
 
 const tasksAdapter = createEntityAdapter({
   selectId: (task) => task._id,
@@ -8,7 +7,7 @@ const tasksAdapter = createEntityAdapter({
 
 const taskSlice = createSlice({
   name: 'tasks',
-  initialState: tasksAdapter.setAll(tasksAdapter.getInitialState(), taskSeed),
+  initialState: tasksAdapter.getInitialState(),
   reducers: {
     hydrateTasksState: (state, action) => {
       tasksAdapter.setAll(state, Object.values(action.payload.entities ?? {}))

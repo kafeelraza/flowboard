@@ -719,6 +719,21 @@ button:disabled {
 .collaborator-row {
   grid-template-columns: auto 1fr auto;
   align-items: center;
+  column-gap: 10px;
+}
+
+.collaborator-row > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.collaborator-row strong,
+.collaborator-row span,
+.collaborator-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace-chip-grid {

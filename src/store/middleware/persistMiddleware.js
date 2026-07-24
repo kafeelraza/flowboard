@@ -58,6 +58,10 @@ export const flushOfflineQueue = async (state) => {
 }
 
 export const loadLocalSnapshot = () => JSON.parse(localStorage.getItem(LOCAL_KEY) || 'null')
+export const clearLocalSnapshot = () => {
+  localStorage.removeItem(LOCAL_KEY)
+  localStorage.removeItem(LAST_WRITE_KEY)
+}
 export const queuedOfflineCount = () => JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]').length
 export const lastLocalWriteAt = () => Number(localStorage.getItem(LAST_WRITE_KEY) || 0)
 export const rememberRemoteSnapshot = (snapshot) => {

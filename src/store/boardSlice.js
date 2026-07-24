@@ -1,9 +1,15 @@
 import { createSlice } from '@reduxjs/toolkit'
-import { boardSeed } from '../data/seed.js'
+
+const emptyBoardState = {
+  currentBoardId: null,
+  boardsById: {},
+  columnsById: {},
+  columnOrder: [],
+}
 
 const boardSlice = createSlice({
   name: 'board',
-  initialState: boardSeed,
+  initialState: emptyBoardState,
   reducers: {
     setBoard: (state, action) => action.payload,
     hydrateBoardState: (state, action) => {
