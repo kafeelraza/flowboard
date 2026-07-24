@@ -1957,3 +1957,41 @@ body {
   height: 100%;
   border-radius: 14px;
 }
+
+/* Keep the four default board columns inside the viewport */
+.board-container {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(14px, 1.45vw, 28px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: clamp(18px, 2vw, 28px) clamp(18px, 2.2vw, 36px) 36px;
+  align-items: start;
+}
+
+.kanban-column {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.kanban-card {
+  padding: clamp(14px, 1vw, 18px);
+}
+
+.cards-container {
+  padding-inline: clamp(10px, 0.8vw, 14px);
+}
+
+@media (max-width: 1100px) {
+  .board-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .board-container {
+    grid-template-columns: 1fr;
+  }
+}
