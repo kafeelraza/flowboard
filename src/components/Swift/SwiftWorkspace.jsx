@@ -31,7 +31,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { markUndoable } from '../../store/actionCreators.js'
 import { boardActions, selectBoard, selectColumnsInOrder } from '../../store/boardSlice.js'
@@ -143,26 +143,47 @@ function Header({
   toggleTheme,
   viewMode,
   setViewMode,
+  setActiveTab,
   searchQuery,
   setSearchQuery,
   aiText,
   setAiText,
   parseAiTask,
   aiStatus,
-  onlineUsers,
   currentUser,
   selectedAvatarId,
+  boardMembers,
+  openMembers,
   inboxOpen,
   setInboxOpen,
   inboxEntries,
 }) {
+  const boardMenuRef = useRef(null)
+  const inboxMenuRef = useRef(null)
+
+  useEffect(() => {
+    const closeMenus = (event) => {
+      if (boardMenuRef.current && !boardMenuRef.current.contains(event.target)) setBoardsOpen(false)
+      if (inboxMenuRef.current && !inboxMenuRef.current.contains(event.target)) setInboxOpen(false)
+    }
+    document.addEventListener('pointerdown', closeMenus)
+    return () => document.removeEventListener('pointerdown', closeMenus)
+  }, [setBoardsOpen, setInboxOpen])
+
+  const showBoardView = (nextViewMode) => {
+    setActiveTab('board')
+    setViewMode(nextViewMode)
+  }
+
+  const visibleMembers = (boardMembers.length > 0 ? boardMembers : [currentUser]).filter(Boolean).slice(0, 2)
+
   return (
     <header className="header">
       <div className="header-left">
         <span className="header-subtitle">Projects / FlowBoard</span>
         <div className="header-title-row">
           <h1 className="header-title">{board?.title ?? 'Project Kanban'}</h1>
-          <div className="swift-board-switcher">
+          <div className="swift-board-switcher" ref={boardMenuRef}>
             <button className="theme-toggle-btn" onClick={() => setBoardsOpen((value) => !value)} title="Switch board">
               <ChevronDown size={16} />
             </button>
@@ -192,15 +213,15 @@ function Header({
       </div>
 
       <div className="view-tabs">
-        <button className={`view-tab ${viewMode === 'board' ? 'active' : ''}`} onClick={() => setViewMode('board')}>
+        <button className={`view-tab ${viewMode === 'board' ? 'active' : ''}`} onClick={() => showBoardView('board')}>
           <Kanban size={16} />
           <span>Board</span>
         </button>
-        <button className={`view-tab ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}>
+        <button className={`view-tab ${viewMode === 'list' ? 'active' : ''}`} onClick={() => showBoardView('list')}>
           <ListFilter size={16} />
           <span>List</span>
         </button>
-        <button className={`view-tab ${viewMode === 'calendar' ? 'active' : ''}`} onClick={() => setViewMode('calendar')}>
+        <button className={`view-tab ${viewMode === 'calendar' ? 'active' : ''}`} onClick={() => showBoardView('calendar')}>
           <CalendarDays size={16} />
           <span>Calendar</span>
         </button>
@@ -216,18 +237,19 @@ function Header({
           <Search size={16} className="search-icon" />
           <input className="search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search tasks..." />
         </div>
-        <div className="swift-live-stack" title={`${onlineUsers.length + (currentUser?._id ? 1 : 0)} live`}>
-          {[currentUser, ...onlineUsers.map((user) => ({ _id: user.userId, name: user.name }))].filter(Boolean).slice(0, 4).map((user) => (
+        <button className="swift-live-stack" onClick={openMembers} title="Open board members">
+          {visibleMembers.map((user) => (
             <img key={user._id} src={avatarFor(user._id, user._id === currentUser?._id ? selectedAvatarId : null)} alt={user.name} />
           ))}
-        </div>
+          {boardMembers.length > 2 && <span>+{boardMembers.length - 2}</span>}
+        </button>
         <button className="theme-toggle-btn" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }))} title="Undo">
           <RotateCcw size={18} />
         </button>
         <button className="theme-toggle-btn" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }))} title="Redo">
           <RotateCw size={18} />
         </button>
-        <div className="swift-board-switcher">
+        <div className="swift-board-switcher" ref={inboxMenuRef}>
           <button className="theme-toggle-btn" onClick={() => setInboxOpen((value) => !value)} title="Notifications">
             <Bell size={18} />
             {inboxEntries.length > 0 && <span className="swift-dot" />}
@@ -413,6 +435,38 @@ function ListView({ tasks, columns, searchQuery, onCardClick }) {
   )
 }
 
+function CalendarView({ tasks, onCardClick }) {
+  const datedTasks = tasks
+    .filter((task) => task.dueDate)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+
+  return (
+    <div className="list-view-container calendar-view">
+      {datedTasks.length === 0 ? (
+        <div className="view-placeholder">
+          <CalendarDays size={48} style={{ color: 'var(--accent)' }} />
+          <h4 className="view-placeholder-title">No Due Dates Yet</h4>
+          <p className="view-placeholder-desc">Add due dates to tasks and they will appear in this calendar view.</p>
+        </div>
+      ) : (
+        datedTasks.map((task) => (
+          <button key={task.id} className="calendar-task-card" onClick={() => onCardClick(task)}>
+            <div className="calendar-date-pill">
+              <strong>{formatDate(task.dueDate)}</strong>
+              <span>{new Date(`${task.dueDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+            </div>
+            <div>
+              <h3>{task.title}</h3>
+              <p>{task.description || 'No description'}</p>
+            </div>
+            <span className={`card-tag tag-${task.priority}`}>{task.priority}</span>
+          </button>
+        ))
+      )}
+    </div>
+  )
+}
+
 function CardModal({ isOpen, onClose, task, columnId, onSave, onDelete, currentUser }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -543,6 +597,42 @@ function CardModal({ isOpen, onClose, task, columnId, onSave, onDelete, currentU
   )
 }
 
+function BoardNameModal({ isOpen, title, setTitle, onClose, onCreate }) {
+  if (!isOpen) return null
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content board-name-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-header-left">
+            <h2>Create Board</h2>
+          </div>
+          <button className="modal-close-btn" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="modal-section">
+            <span className="modal-section-title">Board name</span>
+            <input
+              className="modal-input"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && onCreate()}
+              placeholder="Design Sprint"
+              autoFocus
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="save-btn" onClick={onCreate}>Create Board</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SwiftWorkspace() {
   const dispatch = useDispatch()
   const board = useSelector(selectBoard)
@@ -569,6 +659,8 @@ export function SwiftWorkspace() {
   const [inviteStatus, setInviteStatus] = useState(null)
   const [boardMembers, setBoardMembers] = useState([])
   const [membersStatus, setMembersStatus] = useState('idle')
+  const [isBoardModalOpen, setIsBoardModalOpen] = useState(false)
+  const [newBoardTitle, setNewBoardTitle] = useState('')
   const [draggingTaskId, setDraggingTaskId] = useState(null)
   const [modalTask, setModalTask] = useState(null)
   const [modalColumnId, setModalColumnId] = useState(null)
@@ -604,7 +696,7 @@ export function SwiftWorkspace() {
   }, [inboxOpen, token])
 
   useEffect(() => {
-    if (activeTab !== 'members' || !currentBoardId || !token) return
+    if (!currentBoardId || !token) return
     let cancelled = false
 
     const loadMembers = async () => {
@@ -628,7 +720,7 @@ export function SwiftWorkspace() {
     return () => {
       cancelled = true
     }
-  }, [activeTab, currentBoardId, token])
+  }, [currentBoardId, token])
 
   const usersById = useMemo(() => {
     const users = new Map()
@@ -676,8 +768,13 @@ export function SwiftWorkspace() {
   }
 
   const createBoard = () => {
-    const title = window.prompt('Board name', `Untitled Board ${boards.length + 1}`)
-    if (!title?.trim()) return
+    setNewBoardTitle(`Untitled Board ${boards.length + 1}`)
+    setIsBoardModalOpen(true)
+  }
+
+  const confirmCreateBoard = () => {
+    const title = newBoardTitle.trim()
+    if (!title) return
     const boardId = createId('board')
     const starterColumns = ['To Do', 'In Progress', 'In Review', 'Completed'].map((columnTitle, order) => ({
       _id: createId('col'),
@@ -691,7 +788,7 @@ export function SwiftWorkspace() {
         boardActions.createBoard({
           board: {
             _id: boardId,
-            title: title.trim(),
+            title,
             ownerId: currentUser?._id,
             members: currentUser?._id ? [currentUser._id] : [],
             columns: starterColumns.map((column) => column._id),
@@ -705,6 +802,8 @@ export function SwiftWorkspace() {
     setActiveTab('board')
     setViewMode('board')
     setBoardsOpen(false)
+    setIsBoardModalOpen(false)
+    setNewBoardTitle('')
   }
 
   const deleteBoard = async () => {
@@ -903,13 +1002,7 @@ export function SwiftWorkspace() {
         return <KanbanBoard columns={columns} tasks={tasks} searchQuery={searchQuery} onCardClick={openTask} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDropCard={handleDropCard} onQuickAddClick={openNewTask} />
       }
       if (viewMode === 'list') return <ListView tasks={tasks} columns={columns} searchQuery={searchQuery} onCardClick={openTask} />
-      return (
-        <div className="view-placeholder">
-          <CalendarDays size={48} style={{ color: 'var(--accent)' }} />
-          <h4 className="view-placeholder-title">Calendar View</h4>
-          <p className="view-placeholder-desc">Deadlines and milestones from this board will appear here.</p>
-        </div>
-      )
+      return <CalendarView tasks={tasks} onCardClick={openTask} />
     }
 
     if (activeTab === 'dashboard') {
@@ -1059,15 +1152,17 @@ export function SwiftWorkspace() {
           toggleTheme={toggleTheme}
           viewMode={viewMode}
           setViewMode={setViewMode}
+          setActiveTab={setActiveTab}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           aiText={aiText}
           setAiText={setAiText}
           parseAiTask={parseAiTask}
           aiStatus={aiStatus}
-          onlineUsers={onlineUsers}
           currentUser={currentUser}
           selectedAvatarId={selectedAvatarId}
+          boardMembers={boardMembers}
+          openMembers={() => setActiveTab('members')}
           inboxOpen={inboxOpen}
           setInboxOpen={setInboxOpen}
           inboxEntries={[...inboxEntries, ...activity]}
@@ -1075,6 +1170,7 @@ export function SwiftWorkspace() {
         {renderContent()}
       </main>
       <CardModal isOpen={isModalOpen} onClose={closeModal} task={modalTask} columnId={modalColumnId ?? columns[0]?.id} onSave={saveTask} onDelete={deleteTask} currentUser={currentUser} />
+      <BoardNameModal isOpen={isBoardModalOpen} title={newBoardTitle} setTitle={setNewBoardTitle} onClose={() => setIsBoardModalOpen(false)} onCreate={confirmCreateBoard} />
     </div>
   )
 }

@@ -1611,6 +1611,9 @@ body {
   display: flex;
   align-items: center;
   padding-left: 8px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .swift-live-stack img {
@@ -1621,6 +1624,20 @@ body {
   border-radius: 999px;
   object-fit: cover;
   box-shadow: var(--shadow-sm);
+}
+
+.swift-live-stack span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin-left: -8px;
+  place-items: center;
+  border: 2px solid var(--bg-secondary);
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 900;
 }
 
 .swift-dot {
@@ -1722,6 +1739,54 @@ body {
 .member-card .delete-btn {
   margin-right: 0;
   padding: 8px 10px;
+}
+
+.board-name-modal {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.calendar-view {
+  gap: 14px;
+}
+
+.calendar-task-card {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--border-card);
+  border-radius: 18px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  text-align: left;
+  box-shadow: var(--shadow-card);
+}
+
+.calendar-date-pill {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  min-height: 64px;
+  border-radius: 14px;
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.calendar-date-pill strong {
+  font-size: 14px;
+}
+
+.calendar-date-pill span,
+.calendar-task-card p {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.calendar-task-card h3 {
+  margin: 0 0 5px;
+  font-size: 15px;
 }
 
 .list-header,
