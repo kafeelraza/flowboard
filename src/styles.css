@@ -1511,6 +1511,219 @@ body {
   font-weight: 800;
 }
 
+.swift-board-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.swift-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  min-width: 260px;
+  max-width: 360px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-lg);
+}
+
+.board-menu {
+  right: auto;
+  left: 0;
+}
+
+.swift-popover button,
+.swift-popover > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.swift-popover button:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.danger-menu-item {
+  color: var(--tag-high-text) !important;
+}
+
+.swift-empty {
+  color: var(--text-muted) !important;
+  font-size: 12px !important;
+}
+
+.ai-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 280px;
+  min-width: 220px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+}
+
+.ai-quick-add svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.ai-quick-add input {
+  min-width: 0;
+  flex: 1;
+  padding: 10px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.ai-quick-add button {
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.swift-live-stack {
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+
+.swift-live-stack img {
+  width: 28px;
+  height: 28px;
+  margin-left: -8px;
+  border: 2px solid var(--bg-secondary);
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
+}
+
+.swift-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--bg-secondary);
+  border-radius: 999px;
+  background: var(--tag-high-dot);
+}
+
+.inbox-menu strong {
+  padding: 4px 8px 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.inbox-entry {
+  display: block !important;
+  color: var(--text-secondary) !important;
+  line-height: 1.45;
+}
+
+.sidebar-footer {
+  gap: 10px;
+}
+
+.swift-logout-btn {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.swift-logout-btn:hover {
+  color: var(--tag-high-text);
+  border-color: var(--tag-high-text);
+}
+
+.members-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 460px);
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.members-toolbar h3 {
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.members-toolbar p,
+.member-card small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.swift-invite-form {
+  display: flex;
+  gap: 10px;
+}
+
+.swift-invite-form input {
+  min-width: 0;
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  outline: 0;
+}
+
+.swift-status {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.swift-status.success,
+.live-text {
+  color: var(--tag-low-text) !important;
+}
+
+.swift-status.error,
+.offline-text {
+  color: var(--tag-high-text) !important;
+}
+
+.member-card .delete-btn {
+  margin-right: 0;
+  padding: 8px 10px;
+}
+
 .list-header,
 .list-row {
   display: grid;
@@ -1616,5 +1829,29 @@ body {
   .list-row,
   .modal-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1500px) {
+  .header {
+    height: auto;
+    min-height: 88px;
+    gap: 14px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .ai-quick-add {
+    width: 240px;
+  }
+
+  .search-container {
+    width: 210px;
   }
 }

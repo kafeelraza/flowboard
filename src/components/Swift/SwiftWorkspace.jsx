@@ -1,10 +1,12 @@
 import {
   BarChart2,
   BarChart3,
+  Bell,
   Calendar,
   CalendarDays,
   CheckCircle2,
   CheckSquare,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -12,12 +14,16 @@ import {
   Kanban,
   LayoutDashboard,
   ListFilter,
+  LogOut,
   Mail,
   Moon,
   MoreHorizontal,
   Plus,
+  RotateCcw,
+  RotateCw,
   Search,
   Settings,
+  Sparkles,
   Sun,
   Trash2,
   UserCheck,
@@ -28,10 +34,11 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { markUndoable } from '../../store/actionCreators.js'
-import { selectBoard, selectColumnsInOrder } from '../../store/boardSlice.js'
+import { boardActions, selectBoard, selectColumnsInOrder } from '../../store/boardSlice.js'
 import { createId } from '../../store/id.js'
 import { presenceActions } from '../../store/presenceSlice.js'
 import { taskActions } from '../../store/taskSlice.js'
+import { userActions } from '../../store/userSlice.js'
 
 const avatarImages = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
@@ -72,7 +79,7 @@ const isOverdue = (dateStr) => {
   return new Date(`${dateStr}T00:00:00`) < today
 }
 
-function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user }) {
+function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user, onLogout }) {
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
@@ -105,6 +112,9 @@ function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user }) {
             <span className="user-email">{user?.email ?? 'workspace@flowboard.app'}</span>
           </div>
         </div>
+        <button className="swift-logout-btn" onClick={onLogout} title="Log out">
+          <LogOut size={15} />
+        </button>
       </div>
 
       <button className="sidebar-toggle-btn" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
@@ -114,13 +124,63 @@ function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user }) {
   )
 }
 
-function Header({ board, theme, toggleTheme, viewMode, setViewMode, searchQuery, setSearchQuery, onAddTaskClick }) {
+function Header({
+  board,
+  boards,
+  boardsOpen,
+  setBoardsOpen,
+  switchBoard,
+  deleteBoard,
+  createBoard,
+  theme,
+  toggleTheme,
+  viewMode,
+  setViewMode,
+  searchQuery,
+  setSearchQuery,
+  aiText,
+  setAiText,
+  parseAiTask,
+  aiStatus,
+  onAddTaskClick,
+  onlineUsers,
+  currentUser,
+  inboxOpen,
+  setInboxOpen,
+  inboxEntries,
+}) {
   return (
     <header className="header">
       <div className="header-left">
         <span className="header-subtitle">Projects / FlowBoard</span>
         <div className="header-title-row">
           <h1 className="header-title">{board?.title ?? 'Project Kanban'}</h1>
+          <div className="swift-board-switcher">
+            <button className="theme-toggle-btn" onClick={() => setBoardsOpen((value) => !value)} title="Switch board">
+              <ChevronDown size={16} />
+            </button>
+            {boardsOpen && (
+              <div className="swift-popover board-menu">
+                {boards.length === 0 ? (
+                  <span className="swift-empty">No saved boards yet</span>
+                ) : (
+                  boards.map((item) => (
+                    <button key={item.boardId} onClick={() => switchBoard(item.boardId)}>
+                      {item.title}
+                    </button>
+                  ))
+                )}
+                <button onClick={createBoard}>
+                  <Plus size={14} /> New board
+                </button>
+                {board && (
+                  <button className="danger-menu-item" onClick={deleteBoard}>
+                    <Trash2 size={14} /> Delete current board
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -140,12 +200,53 @@ function Header({ board, theme, toggleTheme, viewMode, setViewMode, searchQuery,
       </div>
 
       <div className="header-right">
+        <div className="ai-quick-add">
+          <Sparkles size={16} />
+          <input value={aiText} onChange={(event) => setAiText(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && parseAiTask()} placeholder="Fix navbar by Friday, high priority" />
+          <button onClick={parseAiTask} disabled={aiStatus === 'loading'}>{aiStatus === 'loading' ? 'AI...' : 'AI'}</button>
+        </div>
         <div className="search-container">
           <Search size={16} className="search-icon" />
           <input className="search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search tasks..." />
         </div>
+        <div className="swift-live-stack" title={`${onlineUsers.length + (currentUser?._id ? 1 : 0)} live`}>
+          {[currentUser, ...onlineUsers.map((user) => ({ _id: user.userId, name: user.name }))].filter(Boolean).slice(0, 4).map((user) => (
+            <img key={user._id} src={avatarFor(user._id)} alt={user.name} />
+          ))}
+        </div>
+        <button className="theme-toggle-btn" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }))} title="Undo">
+          <RotateCcw size={18} />
+        </button>
+        <button className="theme-toggle-btn" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }))} title="Redo">
+          <RotateCw size={18} />
+        </button>
+        <div className="swift-board-switcher">
+          <button className="theme-toggle-btn" onClick={() => setInboxOpen((value) => !value)} title="Notifications">
+            <Bell size={18} />
+            {inboxEntries.length > 0 && <span className="swift-dot" />}
+          </button>
+          {inboxOpen && (
+            <div className="swift-popover inbox-menu">
+              <strong>Notifications</strong>
+              {inboxEntries.length === 0 ? (
+                <span className="swift-empty">No updates yet</span>
+              ) : (
+                inboxEntries.slice(0, 6).map((entry) => (
+                  <span key={entry.id ?? entry._id} className="inbox-entry">
+                    {entry.userName ?? 'FlowBoard'} {String(entry.action ?? 'updated').replaceAll('_', ' ')}
+                    {entry.targetTitle ? `: ${entry.targetTitle}` : ''}
+                  </span>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+        <button className="action-btn" onClick={createBoard}>
+          <Plus size={16} />
+          <span>New Board</span>
         </button>
         <button className="action-btn" onClick={onAddTaskClick}>
           <Plus size={16} />
@@ -444,13 +545,26 @@ export function SwiftWorkspace() {
   const board = useSelector(selectBoard)
   const sourceColumns = useSelector(selectColumnsInOrder)
   const sourceTasks = useSelector((state) => Object.values(state.tasks.entities).filter((task) => task.boardId === state.board.currentBoardId))
+  const currentBoardId = useSelector((state) => state.board.currentBoardId)
+  const token = useSelector((state) => state.user.token)
   const currentUser = useSelector((state) => state.user.currentUser)
   const onlineUsers = useSelector((state) => state.presence.onlineUsers)
+  const activity = useSelector((state) => state.activity.entries.filter((entry) => entry.boardId === state.board.currentBoardId).slice(0, 6))
   const [theme, setTheme] = useState(() => localStorage.getItem('flowboard:theme') || 'light')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('board')
   const [viewMode, setViewMode] = useState('board')
   const [searchQuery, setSearchQuery] = useState('')
+  const [boardsOpen, setBoardsOpen] = useState(false)
+  const [boards, setBoards] = useState([])
+  const [inboxOpen, setInboxOpen] = useState(false)
+  const [inboxEntries, setInboxEntries] = useState([])
+  const [aiText, setAiText] = useState('')
+  const [aiStatus, setAiStatus] = useState('idle')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteStatus, setInviteStatus] = useState(null)
+  const [boardMembers, setBoardMembers] = useState([])
+  const [membersStatus, setMembersStatus] = useState('idle')
   const [draggingTaskId, setDraggingTaskId] = useState(null)
   const [modalTask, setModalTask] = useState(null)
   const [modalColumnId, setModalColumnId] = useState(null)
@@ -460,6 +574,53 @@ export function SwiftWorkspace() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('flowboard:theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    if (!boardsOpen || !token) return
+    fetch('/api/boards', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => response.json())
+      .then(setBoards)
+      .catch(() => setBoards([]))
+  }, [boardsOpen, token])
+
+  useEffect(() => {
+    if (!token || !inboxOpen) return
+    fetch('/api/activity/inbox', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => response.json())
+      .then((entries) => setInboxEntries(Array.isArray(entries) ? entries : []))
+      .catch(() => setInboxEntries([]))
+  }, [inboxOpen, token])
+
+  useEffect(() => {
+    if (activeTab !== 'members' || !currentBoardId || !token) return
+    let cancelled = false
+
+    const loadMembers = async () => {
+      setMembersStatus('loading')
+      try {
+        const response = await fetch(`/api/boards/${currentBoardId}/members`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error ?? 'Could not load members')
+        if (!cancelled) {
+          setBoardMembers(result.members ?? [])
+          setMembersStatus('ready')
+        }
+      } catch {
+        if (!cancelled) setMembersStatus('failed')
+      }
+    }
+
+    loadMembers()
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, currentBoardId, token])
 
   const usersById = useMemo(() => {
     const users = new Map()
@@ -491,6 +652,149 @@ export function SwiftWorkspace() {
   })
 
   const toggleTheme = () => setTheme((value) => (value === 'light' ? 'dark' : 'light'))
+
+  const switchBoard = async (boardId) => {
+    setBoardsOpen(false)
+    const response = await fetch(`/api/boards/${boardId}/state`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    const snapshot = await response.json()
+    if (snapshot?.board && snapshot?.tasks) {
+      dispatch({ ...boardActions.hydrateBoardState(snapshot.board), meta: { skipPersist: true } })
+      dispatch({ ...taskActions.hydrateTasksState(snapshot.tasks), meta: { skipPersist: true } })
+      setActiveTab('board')
+      setViewMode('board')
+    }
+  }
+
+  const createBoard = () => {
+    const title = window.prompt('Board name', `Untitled Board ${boards.length + 1}`)
+    if (!title?.trim()) return
+    const boardId = createId('board')
+    const starterColumns = ['To Do', 'In Progress', 'In Review', 'Completed'].map((columnTitle, order) => ({
+      _id: createId('col'),
+      boardId,
+      title: columnTitle,
+      order,
+      taskIds: [],
+    }))
+    dispatch(
+      markUndoable(
+        boardActions.createBoard({
+          board: {
+            _id: boardId,
+            title: title.trim(),
+            ownerId: currentUser?._id,
+            members: currentUser?._id ? [currentUser._id] : [],
+            columns: starterColumns.map((column) => column._id),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          columns: starterColumns,
+        }),
+      ),
+    )
+    setActiveTab('board')
+    setViewMode('board')
+    setBoardsOpen(false)
+  }
+
+  const deleteBoard = async () => {
+    if (!board) return
+    if (board.ownerId !== currentUser?._id) {
+      window.alert('Only the board owner can delete this board.')
+      return
+    }
+    if (!window.confirm(`Delete "${board.title}"? This cannot be undone.`)) return
+    const response = await fetch(`/api/boards/${board._id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      window.alert(result.error ?? 'Could not delete board')
+      return
+    }
+    dispatch(taskActions.deleteTasksByBoard(board._id))
+    dispatch(boardActions.deleteBoard(board._id))
+    setBoards((items) => items.filter((item) => item.boardId !== board._id))
+    setBoardsOpen(false)
+  }
+
+  const parseAiTask = async () => {
+    if (!aiText.trim() || !board || !columns[0]) return
+    setAiStatus('loading')
+    try {
+      const response = await fetch('/api/ai/parse-nl-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: aiText }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? 'AI parse failed')
+      dispatch(markUndoable(taskActions.addTask({
+        _id: createId('task'),
+        boardId: board._id,
+        columnId: columns[0].id,
+        title: result.title ?? aiText,
+        description: 'Created from AI-assisted natural language quick add.',
+        subtasks: [],
+        labels: [{ text: 'ai', color: categoryColors.design }],
+        priority: result.priority ?? 'medium',
+        dueDate: result.dueDate ?? null,
+        assigneeIds: currentUser?._id ? [currentUser._id] : [],
+        createdBy: currentUser?._id,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })))
+      setAiText('')
+      setAiStatus('idle')
+    } catch (error) {
+      setAiStatus('idle')
+      window.alert(error.message)
+    }
+  }
+
+  const inviteCollaborator = async (event) => {
+    event.preventDefault()
+    if (!inviteEmail.trim() || !currentBoardId) return
+    setInviteStatus({ type: 'loading', text: 'Inviting...' })
+    try {
+      const response = await fetch(`/api/boards/${currentBoardId}/invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? 'Invite failed')
+      setInviteEmail('')
+      setInviteStatus({ type: 'success', text: `${result.invitedUser.email} can now open this board.` })
+      dispatch(boardActions.setBoardMembers({ boardId: currentBoardId, ownerId: result.ownerId, members: result.members }))
+      setBoardMembers((members) => {
+        if (members.some((member) => member._id === result.invitedUser._id)) return members
+        return [...members, { ...result.invitedUser, role: 'Collaborator' }]
+      })
+    } catch (error) {
+      setInviteStatus({ type: 'error', text: error.message })
+    }
+  }
+
+  const removeCollaborator = async (userId) => {
+    const response = await fetch(`/api/boards/${currentBoardId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setInviteStatus({ type: 'error', text: result.error ?? 'Could not remove collaborator' })
+      return
+    }
+    dispatch(boardActions.setBoardMembers({ boardId: currentBoardId, members: result.members }))
+    setBoardMembers((members) => members.filter((member) => member._id !== userId))
+  }
 
   const openTask = (task) => {
     dispatch(presenceActions.startedEditingTask({ taskId: task.id, userId: currentUser?._id }))
@@ -579,6 +883,9 @@ export function SwiftWorkspace() {
           <FolderGit2 size={48} style={{ color: 'var(--accent)' }} />
           <h4 className="view-placeholder-title">No Board Selected</h4>
           <p className="view-placeholder-desc">Create or open a FlowBoard project to start working.</p>
+          <button className="action-btn" onClick={createBoard} style={{ marginTop: '18px' }}>
+            <Plus size={16} /> New Board
+          </button>
         </div>
       )
     }
@@ -661,11 +968,32 @@ export function SwiftWorkspace() {
     }
 
     if (activeTab === 'members') {
+      const fallbackMembers = [currentUser, ...onlineUsers.map((user) => ({ _id: user.userId, name: user.name, email: user.email, role: 'Collaborator' }))].filter(Boolean)
+      const membersToShow = boardMembers.length > 0 ? boardMembers : fallbackMembers
       return (
         <div className="list-view-container">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
-            {[currentUser, ...onlineUsers.map((user) => ({ _id: user.userId, name: user.name, email: user.email }))].filter(Boolean).map((member) => (
-              <div key={member._id} className="dashboard-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'default' }}>
+          <div className="members-toolbar dashboard-card">
+            <div>
+              <h3>Board members ({membersToShow.length})</h3>
+              <p>Invite registered users, check who is live, and remove collaborators.</p>
+            </div>
+            <form className="swift-invite-form" onSubmit={inviteCollaborator}>
+              <input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} type="email" placeholder="teammate@example.com" />
+              <button className="action-btn" disabled={inviteStatus?.type === 'loading'}>
+                <Plus size={14} /> Invite
+              </button>
+            </form>
+            {inviteStatus && <span className={`swift-status ${inviteStatus.type}`}>{inviteStatus.text}</span>}
+          </div>
+          {membersStatus === 'loading' && <span className="swift-empty">Loading collaborators...</span>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+            {membersToShow.map((member) => {
+              const isCurrent = member._id === currentUser?._id
+              const liveUser = onlineUsers.find((user) => user.userId === member._id)
+              const isLive = isCurrent || Boolean(liveUser)
+              const canRemove = board?.ownerId === currentUser?._id && !isCurrent
+              return (
+              <div key={member._id} className="dashboard-card member-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'default' }}>
                 <img src={avatarFor(member._id)} alt={member.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
                 <div style={{ flex: 1 }}>
                   <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{member.name}</h4>
@@ -673,10 +1001,15 @@ export function SwiftWorkspace() {
                     <Mail size={12} />
                     {member.email ?? 'online@flowboard.app'}
                   </span>
+                  <small className={isLive ? 'live-text' : 'offline-text'}>{member.role ?? (isCurrent ? 'Owner' : 'Collaborator')} - {isLive ? 'Live now' : 'Offline'}</small>
                 </div>
-                <UserCheck size={18} style={{ color: 'var(--accent)' }} />
+                {canRemove ? (
+                  <button className="delete-btn" onClick={() => removeCollaborator(member._id)}>Remove</button>
+                ) : (
+                  <UserCheck size={18} style={{ color: 'var(--accent)' }} />
+                )}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )
@@ -694,9 +1027,33 @@ export function SwiftWorkspace() {
 
   return (
     <div className="app-container">
-      <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} activeTab={activeTab} setActiveTab={setActiveTab} user={currentUser} />
+      <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} activeTab={activeTab} setActiveTab={setActiveTab} user={currentUser} onLogout={() => dispatch(userActions.logout())} />
       <main className="main-content">
-        <Header board={board} theme={theme} toggleTheme={toggleTheme} viewMode={viewMode} setViewMode={setViewMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onAddTaskClick={() => openNewTask()} />
+        <Header
+          board={board}
+          boards={boards}
+          boardsOpen={boardsOpen}
+          setBoardsOpen={setBoardsOpen}
+          switchBoard={switchBoard}
+          deleteBoard={deleteBoard}
+          createBoard={createBoard}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          aiText={aiText}
+          setAiText={setAiText}
+          parseAiTask={parseAiTask}
+          aiStatus={aiStatus}
+          onAddTaskClick={() => openNewTask()}
+          onlineUsers={onlineUsers}
+          currentUser={currentUser}
+          inboxOpen={inboxOpen}
+          setInboxOpen={setInboxOpen}
+          inboxEntries={[...inboxEntries, ...activity]}
+        />
         {renderContent()}
       </main>
       <CardModal isOpen={isModalOpen} onClose={closeModal} task={modalTask} columnId={modalColumnId ?? columns[0]?.id} onSave={saveTask} onDelete={deleteTask} currentUser={currentUser} />
