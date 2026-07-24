@@ -26,7 +26,13 @@ export const createSocketMiddleware = () => (store) => {
     Boolean(import.meta.env.VITE_REALTIME_URL)
 
   if (typeof window !== 'undefined' && realtimeEnabled) {
-    socket = io(import.meta.env.VITE_REALTIME_URL || '/', { autoConnect: true })
+    socket = io(import.meta.env.VITE_REALTIME_URL || '/', {
+      autoConnect: true,
+      reconnectionDelay: 500,
+      timeout: 5000,
+      transports: ['websocket'],
+      upgrade: false,
+    })
 
     socket.on('connect', () => {
       joinedBoardId = null
