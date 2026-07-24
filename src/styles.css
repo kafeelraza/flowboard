@@ -2536,3 +2536,35 @@ body,
     max-height: calc(100vh - 112px);
   }
 }
+
+/* Keep task cards full-size while each column scrolls independently */
+.cards-container {
+  flex: 1 1 auto;
+  gap: 20px;
+  padding: 0 18px 24px;
+  overflow-y: auto;
+  overflow-x: visible;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.cards-container::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.kanban-card {
+  flex: 0 0 auto;
+  min-height: 180px;
+  overflow: visible;
+}
+
+.card-title,
+.card-description {
+  min-height: 1.35em;
+}
+
+.card-footer {
+  margin-top: auto;
+}
