@@ -2568,3 +2568,109 @@ body,
 .card-footer {
   margin-top: auto;
 }
+
+.swift-editing-badge {
+  position: absolute;
+  top: -12px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - 28px);
+  border: 1px solid rgba(99, 102, 241, 0.26);
+  border-radius: 999px;
+  padding: 5px 9px 5px 5px;
+  background: color-mix(in srgb, var(--bg-secondary) 92%, var(--accent));
+  color: var(--accent);
+  box-shadow: 0 10px 22px rgba(99, 102, 241, 0.18);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.swift-editing-badge img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.swift-editing-badge span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swift-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 9px 12px;
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-inline-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.swift-ai-suggestions {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--accent-light);
+}
+
+.swift-ai-suggestions .suggestion-header,
+.swift-ai-suggestions .suggestion-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.swift-ai-suggestions .suggestion-header {
+  justify-content: space-between;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.swift-ai-suggestions .suggestion-row {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.swift-ai-suggestions .suggestion-row span {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.swift-ai-suggestions button {
+  border: 0;
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.swift-ai-suggestions .suggestion-row button:last-child {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}

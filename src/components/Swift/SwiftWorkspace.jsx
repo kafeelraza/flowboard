@@ -287,6 +287,12 @@ function KanbanCard({ task, onCardClick, onDragStart, onDragEnd }) {
 
   return (
     <div className={`kanban-card ${cardClasses}`} draggable onDragStart={(event) => onDragStart(event, task)} onDragEnd={onDragEnd} onClick={() => onCardClick(task)}>
+      {task.editingUser && (
+        <div className="swift-editing-badge">
+          <img src={avatarFor(task.editingUser._id)} alt={task.editingUser.name} />
+          <span>{task.editingUser.name} editing</span>
+        </div>
+      )}
       {task.tags.length > 0 && (
         <div className="card-tags">
           {task.tags.map((tag) => (
@@ -472,6 +478,8 @@ function CardModal({ isOpen, onClose, task, columnId, onSave, onDelete, currentU
   const [dueDate, setDueDate] = useState('')
   const [checklist, setChecklist] = useState([])
   const [newSubtask, setNewSubtask] = useState('')
+  const [aiSuggestions, setAiSuggestions] = useState([])
+  const [aiBreakdownStatus, setAiBreakdownStatus] = useState('idle')
 
   useEffect(() => {
     if (task) {
@@ -489,6 +497,8 @@ function CardModal({ isOpen, onClose, task, columnId, onSave, onDelete, currentU
       setDueDate('')
       setChecklist([])
     }
+    setAiSuggestions([])
+    setAiBreakdownStatus('idle')
   }, [task, isOpen])
 
   if (!isOpen) return null
@@ -512,6 +522,33 @@ function CardModal({ isOpen, onClose, task, columnId, onSave, onDelete, currentU
     if (!newSubtask.trim()) return
     setChecklist((items) => [...items, { id: createId('sub'), text: newSubtask.trim(), completed: false }])
     setNewSubtask('')
+  }
+
+  const breakDownWithAi = async () => {
+    const taskTitle = title.trim() || task?.title || 'New task'
+    setAiBreakdownStatus('loading')
+    try {
+      const response = await fetch('/api/ai/breakdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskTitle }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? 'AI breakdown failed')
+      setAiSuggestions((result.subtasks ?? []).map((text) => ({ id: createId('suggestion'), text })))
+      setAiBreakdownStatus('ready')
+    } catch {
+      setAiBreakdownStatus('failed')
+    }
+  }
+
+  const acceptAiSuggestions = (accepted = aiSuggestions) => {
+    if (accepted.length === 0) return
+    setChecklist((items) => [
+      ...items,
+      ...accepted.map((item) => ({ id: createId('sub'), text: item.text, completed: false })),
+    ])
+    setAiSuggestions((items) => items.filter((item) => !accepted.some((acceptedItem) => acceptedItem.id === item.id)))
   }
 
   return (
@@ -559,7 +596,29 @@ function CardModal({ isOpen, onClose, task, columnId, onSave, onDelete, currentU
             </div>
           </div>
           <div className="modal-section">
-            <span className="modal-section-title">Checklist</span>
+            <div className="swift-section-title-row">
+              <span className="modal-section-title">Checklist</span>
+              <button className="ai-inline-btn" onClick={breakDownWithAi} disabled={aiBreakdownStatus === 'loading'}>
+                <Sparkles size={15} />
+                {aiBreakdownStatus === 'loading' ? 'Thinking...' : 'Break down with AI'}
+              </button>
+            </div>
+            {aiBreakdownStatus === 'failed' && <p className="empty-text">Couldn't reach AI right now. Try again.</p>}
+            {aiSuggestions.length > 0 && (
+              <div className="swift-ai-suggestions">
+                <div className="suggestion-header">
+                  <strong>AI suggestions</strong>
+                  <button onClick={() => acceptAiSuggestions()}>Accept all</button>
+                </div>
+                {aiSuggestions.map((item) => (
+                  <div className="suggestion-row" key={item.id}>
+                    <span>{item.text}</span>
+                    <button onClick={() => acceptAiSuggestions([item])}>Accept</button>
+                    <button onClick={() => setAiSuggestions((items) => items.filter((suggestion) => suggestion.id !== item.id))}>Reject</button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="checklist-items">
               {checklist.map((item) => (
                 <label key={item.id} className="checklist-item">
@@ -698,6 +757,7 @@ export function SwiftWorkspace() {
   const token = useSelector((state) => state.user.token)
   const currentUser = useSelector((state) => state.user.currentUser)
   const onlineUsers = useSelector((state) => state.presence.onlineUsers)
+  const editingMap = useSelector((state) => state.presence.editingMap)
   const activity = useSelector((state) => state.activity.entries.filter((entry) => entry.boardId === state.board.currentBoardId).slice(0, 6))
   const [theme, setTheme] = useState(() => localStorage.getItem('flowboard:theme') || 'light')
   const [selectedAvatarId, setSelectedAvatarId] = useState(() => localStorage.getItem('flowboard:avatar') || avatarOptions[0].id)
@@ -819,6 +879,7 @@ export function SwiftWorkspace() {
         const user = usersById.get(id)
         return { id, name: user?.name ?? 'Teammate', avatar: avatarFor(id, id === currentUser?._id ? selectedAvatarId : null) }
       }),
+      editingUser: editingMap[task._id] && editingMap[task._id] !== currentUser?._id ? usersById.get(editingMap[task._id]) : null,
     }
   })
 
