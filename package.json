@@ -1,0 +1,48 @@
+{
+  "name": "flowboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174 --configLoader runner",
+    "server": "node server/index.js",
+    "start": "node server/index.js",
+    "mongo:start": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Force -Path '.\\\\mongo-data','.\\\\mongo-log' | Out-Null; Start-Process -FilePath 'C:\\\\Program Files\\\\MongoDB\\\\Server\\\\8.3\\\\bin\\\\mongod.exe' -ArgumentList @('--dbpath',(Join-Path (Get-Location) 'mongo-data'),'--logpath',(Join-Path (Get-Location) 'mongo-log\\\\mongod.log'),'--bind_ip','127.0.0.1','--port','27017') -WindowStyle Hidden\"",
+    "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
+    "build": "vite build --configLoader runner",
+    "preview": "vite preview --host 127.0.0.1 --configLoader runner",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@reduxjs/toolkit": "^2.8.2",
+    "bcryptjs": "^3.0.3",
+    "concurrently": "^9.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0",
+    "framer-motion": "^12.23.9",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.468.0",
+    "mongoose": "^9.8.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-redux": "^9.2.0",
+    "recharts": "^3.1.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^9.31.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "vite": "^7.0.4"
+  }
+}

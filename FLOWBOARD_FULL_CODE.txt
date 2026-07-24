@@ -1,0 +1,5216 @@
+﻿# FlowBoard Full Code Export
+Generated from project files. Secrets are excluded; use .env.example as the template.
+
+===== FILE: package.json =====
+```
+{
+  "name": "flowboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174 --configLoader runner",
+    "server": "node server/index.js",
+    "start": "node server/index.js",
+    "mongo:start": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Force -Path '.\\\\mongo-data','.\\\\mongo-log' | Out-Null; Start-Process -FilePath 'C:\\\\Program Files\\\\MongoDB\\\\Server\\\\8.3\\\\bin\\\\mongod.exe' -ArgumentList @('--dbpath',(Join-Path (Get-Location) 'mongo-data'),'--logpath',(Join-Path (Get-Location) 'mongo-log\\\\mongod.log'),'--bind_ip','127.0.0.1','--port','27017') -WindowStyle Hidden\"",
+    "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
+    "build": "vite build --configLoader runner",
+    "preview": "vite preview --host 127.0.0.1 --configLoader runner",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@reduxjs/toolkit": "^2.8.2",
+    "bcryptjs": "^3.0.3",
+    "concurrently": "^9.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0",
+    "framer-motion": "^12.23.9",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.468.0",
+    "mongoose": "^9.8.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-redux": "^9.2.0",
+    "recharts": "^3.1.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^9.31.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "vite": "^7.0.4"
+  }
+}
+
+```
+
+===== FILE: vite.config.js =====
+```
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-redux', '@reduxjs/toolkit'],
+          motion: ['framer-motion', '@dnd-kit/core'],
+          charts: ['recharts'],
+          realtime: ['socket.io-client'],
+        },
+      },
+    },
+  },
+  server: {
+    port: 5174,
+    strictPort: true,
+    proxy: {
+      '/api': 'http://127.0.0.1:4000',
+      '/socket.io': {
+        target: 'ws://127.0.0.1:4000',
+        ws: true,
+      },
+    },
+  },
+})
+
+```
+
+===== FILE: vercel.json =====
+```
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/:path((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
+```
+
+===== FILE: eslint.config.js =====
+```
+import js from '@eslint/js'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import globals from 'globals'
+
+export default [
+  { ignores: ['dist'] },
+  {
+    files: ['**/*.{js,jsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+]
+
+```
+
+===== FILE: index.html =====
+```
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowBoard</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+```
+
+===== FILE: env.example =====
+```
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+MONGO_URI=mongodb://127.0.0.1:27017/flowboard
+JWT_SECRET=replace_this_with_a_long_random_secret
+FRONTEND_ORIGINS=http://127.0.0.1:5174,http://localhost:5174
+VITE_ENABLE_REALTIME=false
+VITE_REALTIME_URL=
+
+```
+
+===== FILE: gitignore =====
+```
+node_modules/
+dist/
+*.log
+.env
+.env.local
+mongo-data/
+mongo-log/
+
+.vercel
+.env*
+
+```
+
+===== FILE: vercelignore =====
+```
+.env
+.env.local
+node_modules
+dist
+mongo-data
+mongo-log
+FLOWBOARD_FULL_CODE.txt
+*.log
+
+```
+
+===== FILE: README.md =====
+```
+# FlowBoard
+
+Collaborative Kanban board built to demonstrate advanced Redux Toolkit patterns:
+undo/redo history, realtime socket sync, AI-assisted task creation, offline queueing,
+and Mongo-backed persistence when configured.
+
+## Run
+
+```bash
+npm install
+npm run mongo:start
+npm run server
+npm run dev
+```
+
+Frontend runs on `http://127.0.0.1:5174`.
+Backend runs on `http://127.0.0.1:4000`.
+
+## Environment
+
+Copy `.env.example` to `.env` and fill values:
+
+```env
+GROQ_API_KEY=your_groq_key
+GROQ_MODEL=llama-3.3-70b-versatile
+MONGO_URI=mongodb://127.0.0.1:27017/flowboard
+JWT_SECRET=replace_this_with_a_long_random_secret
+```
+
+If MongoDB is not running, the server falls back to in-memory persistence.
+If Groq is not configured, AI endpoints fall back to deterministic heuristics.
+
+Local Mongo data is stored in `mongo-data/` and logs in `mongo-log/`.
+
+## Demo Script
+
+1. Open two browser windows at `http://127.0.0.1:5174`.
+2. Move a card and watch the second window sync.
+3. Open a task and confirm the remote editing badge.
+4. Use Undo/Redo and the History panel jump.
+5. Type `Fix navbar bug by Friday, high priority` in Quick Add and confirm the AI draft.
+6. Open a task and use `Break down with AI`.
+7. Turn off network briefly, make a board change, reconnect, and let the offline queue flush.
+
+## Key Files
+
+- `src/store/middleware/historyMiddleware.js` - undo/redo and timeline jump
+- `src/store/middleware/socketMiddleware.js` - realtime action/presence sync
+- `src/store/middleware/persistMiddleware.js` - backend save + offline queue
+- `server/index.js` - Express, Socket.io, Mongo/JWT, Groq endpoints
+
+```
+
+===== FILE: DEMO_SCRIPT.md =====
+```
+# FlowBoard Hackathon Pitch
+
+## Hook
+
+Most Kanban boards make collaboration feel fragile: a teammate deletes a card,
+history disappears, and offline edits become guesswork. FlowBoard treats every
+change as a Redux action stream.
+
+## Live Demo
+
+1. Move a task between columns.
+2. Show the timeline entry created automatically by middleware.
+3. Undo the move, then redo it.
+4. Open a second browser window and show realtime sync.
+5. Open a task in one window and show the editing badge in the other.
+6. Use Quick Add: `Fix navbar bug by Friday, high priority`.
+7. Confirm the AI draft.
+8. Open a task and use `Break down with AI`.
+9. Click Analytics in the sidebar.
+
+## Architecture
+
+Redux action -> history middleware creates inverse action -> socket middleware
+broadcasts action -> reducers update normalized state -> persist middleware saves
+to Mongo or local offline queue.
+
+## Close
+
+FlowBoard is not just a task board. It is a small demonstration of how production
+collaborative tools can structure state around reversible, broadcastable actions.
+
+```
+
+===== FILE: api\index.js =====
+```
+import app from '../server/index.js'
+
+export const config = {
+  maxDuration: 30,
+}
+
+export default app
+
+```
+
+===== FILE: server\index.js =====
+```
+import 'dotenv/config'
+import cors from 'cors'
+import bcrypt from 'bcryptjs'
+import express from 'express'
+import http from 'http'
+import jwt from 'jsonwebtoken'
+import mongoose from 'mongoose'
+import { Server } from 'socket.io'
+
+const app = express()
+const server = http.createServer(app)
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || 'http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:5173,http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+  },
+})
+
+const boardPresence = new Map()
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+const JWT_SECRET = process.env.JWT_SECRET || 'flowboard-local-dev-secret'
+let mongoReady = false
+const memory = {
+  users: new Map(),
+  snapshots: new Map(),
+  activity: [],
+}
+
+const userSchema = new mongoose.Schema(
+  {
+    name: String,
+    email: { type: String, unique: true, index: true },
+    passwordHash: String,
+    avatarColor: String,
+  },
+  { timestamps: true },
+)
+
+const boardSnapshotSchema = new mongoose.Schema(
+  {
+    boardId: { type: String, index: true },
+    ownerId: String,
+    title: String,
+    state: mongoose.Schema.Types.Mixed,
+  },
+  { timestamps: true },
+)
+
+const activitySchema = new mongoose.Schema(
+  {
+    boardId: String,
+    userId: String,
+    userName: String,
+    action: String,
+    targetTitle: String,
+    timestamp: Number,
+  },
+  { timestamps: true },
+)
+
+const User = mongoose.models.User || mongoose.model('User', userSchema)
+const BoardSnapshot = mongoose.models.BoardSnapshot || mongoose.model('BoardSnapshot', boardSnapshotSchema)
+const Activity = mongoose.models.Activity || mongoose.model('Activity', activitySchema)
+
+async function connectMongo() {
+  if (!process.env.MONGO_URI) return
+  try {
+    await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 1200 })
+    mongoReady = true
+    console.log('MongoDB connected')
+  } catch (error) {
+    mongoReady = false
+    console.log(`MongoDB unavailable - using in-memory fallback: ${error.message}`)
+  }
+}
+
+function publicUser(user) {
+  return {
+    _id: user._id?.toString?.() ?? user._id,
+    name: user.name,
+    email: user.email,
+    avatarColor: user.avatarColor,
+  }
+}
+
+function signToken(user) {
+  return jwt.sign({ sub: user._id?.toString?.() ?? user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
+}
+
+function authOptional(req, _res, next) {
+  const header = req.headers.authorization
+  if (!header?.startsWith('Bearer ')) return next()
+  try {
+    req.auth = jwt.verify(header.slice(7), JWT_SECRET)
+  } catch {
+    req.auth = null
+  }
+  next()
+}
+
+async function callGroq(systemPrompt, userPrompt) {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return null
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Groq API error: ${response.status} ${await response.text()}`)
+  }
+
+  const data = await response.json()
+  const text = data.choices?.[0]?.message?.content ?? ''
+  return JSON.parse(text.replace(/```json|```/g, '').trim())
+}
+
+app.use(cors({ origin: allowedOrigins }))
+app.use(express.json())
+app.use(authOptional)
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'FlowBoard API',
+    groqConfigured: Boolean(process.env.GROQ_API_KEY),
+    mongoConnected: mongoReady,
+    persistence: mongoReady ? 'mongodb' : 'memory',
+  })
+})
+
+app.post('/api/auth/signup', async (req, res) => {
+  const { name = 'FlowBoard User', email, password } = req.body
+  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
+
+  const avatarColor = ['#2563eb', '#16a34a', '#f59e0b', '#7c3aed'][Math.floor(Math.random() * 4)]
+  const passwordHash = await bcrypt.hash(password, 10)
+
+  try {
+    let user
+    if (mongoReady) {
+      user = await User.create({ name, email, passwordHash, avatarColor })
+    } else {
+      if (memory.users.has(email)) return res.status(409).json({ error: 'User already exists' })
+      user = { _id: `user-${Date.now()}`, name, email, passwordHash, avatarColor }
+      memory.users.set(email, user)
+    }
+    res.json({ user: publicUser(user), token: signToken(user) })
+  } catch (error) {
+    res.status(409).json({ error: error.code === 11000 ? 'User already exists' : error.message })
+  }
+})
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body
+  const user = mongoReady ? await User.findOne({ email }) : memory.users.get(email)
+  if (!user) return res.status(401).json({ error: 'Invalid credentials' })
+  const ok = await bcrypt.compare(password, user.passwordHash)
+  if (!ok) return res.status(401).json({ error: 'Invalid credentials' })
+  res.json({ user: publicUser(user), token: signToken(user) })
+})
+
+app.get('/api/boards/:boardId/state', async (req, res) => {
+  const { boardId } = req.params
+  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (snapshot?.ownerId && req.auth?.sub && snapshot.ownerId !== req.auth.sub) {
+    return res.status(403).json({ error: 'You do not have access to this board' })
+  }
+  res.json(snapshot?.state ?? null)
+})
+
+app.put('/api/boards/:boardId/state', async (req, res) => {
+  const { boardId } = req.params
+  const state = req.body
+  const title = state?.board?.boardsById?.[boardId]?.title ?? 'FlowBoard'
+  const ownerId = req.auth?.sub ?? state?.user?.currentUser?._id ?? 'local-user'
+  const existing = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (existing?.ownerId && req.auth?.sub && existing.ownerId !== req.auth.sub) {
+    return res.status(403).json({ error: 'You do not have access to this board' })
+  }
+
+  if (mongoReady) {
+    await BoardSnapshot.findOneAndUpdate({ boardId }, { boardId, ownerId, title, state }, { upsert: true, new: true })
+  } else {
+    memory.snapshots.set(boardId, { boardId, ownerId, title, state, updatedAt: new Date() })
+  }
+  res.json({ ok: true, savedAt: Date.now(), persistence: mongoReady ? 'mongodb' : 'memory' })
+})
+
+app.get('/api/boards', async (req, res) => {
+  if (mongoReady) {
+    const query = req.auth?.sub ? { ownerId: req.auth.sub } : {}
+    const boards = await BoardSnapshot.find(query).sort({ updatedAt: -1 }).select('boardId title updatedAt')
+    return res.json(boards)
+  }
+  const boards = [...memory.snapshots.values()].filter((item) => !req.auth?.sub || item.ownerId === req.auth.sub)
+  res.json(boards.map((item) => ({ boardId: item.boardId, title: item.title, updatedAt: item.updatedAt })))
+})
+
+app.get('/api/boards/:boardId/activity', async (req, res) => {
+  const { boardId } = req.params
+  if (mongoReady) {
+    return res.json(await Activity.find({ boardId }).sort({ timestamp: -1 }).limit(50))
+  }
+  res.json(memory.activity.filter((item) => item.boardId === boardId).slice(0, 50))
+})
+
+app.post('/api/boards/:boardId/activity', async (req, res) => {
+  const entry = { ...req.body, boardId: req.params.boardId, timestamp: req.body.timestamp ?? Date.now() }
+  if (mongoReady) await Activity.create(entry)
+  else memory.activity.unshift(entry)
+  res.json({ ok: true })
+})
+
+app.post('/api/ai/breakdown', async (req, res) => {
+  const { taskTitle = 'Task' } = req.body
+
+  try {
+    const result = await callGroq(
+      'You are a project management assistant. Given a task title, break it down into 3-6 concrete, actionable subtasks. Respond ONLY with a JSON array of strings, no other text.',
+      `Task: "${taskTitle}"`,
+    )
+    if (result) {
+      return res.json({ subtasks: result })
+    }
+  } catch (error) {
+    console.error('Groq breakdown failed, falling back to heuristic:', error.message)
+  }
+
+  res.json({
+    subtasks: [
+      `Clarify scope for ${taskTitle}`,
+      'Split implementation into small changes',
+      'Add user-facing polish',
+      'Verify the happy path and undo path',
+    ],
+  })
+})
+
+app.post('/api/ai/parse-nl-task', async (req, res) => {
+  const text = String(req.body.text ?? '')
+  const today = new Date().toISOString().slice(0, 10)
+
+  try {
+    const result = await callGroq(
+      `Extract structured task data from this natural language request. Respond ONLY with JSON in this exact format: { "title": string, "dueDate": "YYYY-MM-DD" or null, "priority": "low"|"medium"|"high" }. Today's date is ${today}.`,
+      `Request: "${text}"`,
+    )
+    if (result) {
+      return res.json(result)
+    }
+  } catch (error) {
+    console.error('Groq parse failed, falling back to heuristic:', error.message)
+  }
+
+  res.json({
+    title: text.replace(/high priority|low priority|medium priority|urgent|asap/gi, '').trim() || text,
+    dueDate: null,
+    priority: /high|urgent|asap/i.test(text) ? 'high' : /low/i.test(text) ? 'low' : 'medium',
+  })
+})
+
+io.on('connection', (socket) => {
+  let activeBoardId = null
+  let activeUser = null
+
+  socket.on('board:join', ({ boardId, user }) => {
+    activeBoardId = boardId
+    activeUser = { ...user, userId: user._id, cursor: null }
+    socket.join(boardId)
+
+    const users = boardPresence.get(boardId) ?? []
+    boardPresence.set(boardId, [...users.filter((item) => item.userId !== activeUser.userId), activeUser])
+    io.to(boardId).emit('presence:update', boardPresence.get(boardId))
+  })
+
+  socket.on('board:action', ({ boardId, action, user }) => {
+    socket.to(boardId).emit('board:action', { action, user })
+  })
+
+  socket.on('presence:cursor', ({ boardId, cursor }) => {
+    if (!activeUser) return
+    const users = boardPresence.get(boardId) ?? []
+    boardPresence.set(
+      boardId,
+      users.map((user) => (user.userId === activeUser.userId ? { ...user, cursor } : user)),
+    )
+    socket.to(boardId).emit('presence:cursor', { userId: activeUser.userId, cursor })
+  })
+
+  socket.on('presence:editing:start', ({ boardId, taskId }) => {
+    if (!activeUser) return
+    socket.to(boardId).emit('presence:editing', { taskId, userId: activeUser.userId, isEditing: true })
+  })
+
+  socket.on('presence:editing:stop', ({ boardId, taskId }) => {
+    if (!activeUser) return
+    socket.to(boardId).emit('presence:editing', { taskId, userId: activeUser.userId, isEditing: false })
+  })
+
+  socket.on('disconnect', () => {
+    if (!activeBoardId || !activeUser) return
+    const users = (boardPresence.get(activeBoardId) ?? []).filter((user) => user.userId !== activeUser.userId)
+    boardPresence.set(activeBoardId, users)
+    io.to(activeBoardId).emit('presence:update', users)
+  })
+})
+
+await connectMongo()
+
+if (!process.env.VERCEL) {
+  server.listen(4000, () => {
+    console.log('FlowBoard API and socket server running at http://127.0.0.1:4000')
+    if (!process.env.GROQ_API_KEY) {
+      console.log('GROQ_API_KEY not set - AI endpoints will use heuristic fallback instead of real Groq calls.')
+    }
+  })
+}
+
+export default app
+
+```
+
+===== FILE: src\App.jsx =====
+```
+import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { useEffect, useRef } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard.jsx'
+import { AuthGate } from './components/Auth/AuthGate.jsx'
+import { BoardCanvas } from './components/Board/BoardCanvas.jsx'
+import { DashboardSidebar } from './components/Layout/DashboardSidebar.jsx'
+import { WorkspacePanel } from './components/Layout/WorkspacePanel.jsx'
+import { SidePanel } from './components/SidePanel/SidePanel.jsx'
+import { TaskModal } from './components/TaskModal/TaskModal.jsx'
+import { TopBar } from './components/TopBar/TopBar.jsx'
+import { taskActions } from './store/taskSlice.js'
+import { markUndoable } from './store/actionCreators.js'
+import { boardActions } from './store/boardSlice.js'
+import { flushOfflineQueue, lastLocalWriteAt, loadLocalSnapshot, rememberRemoteSnapshot } from './store/middleware/persistMiddleware.js'
+import { presenceActions } from './store/presenceSlice.js'
+import { uiActions } from './store/uiSlice.js'
+
+export default function App() {
+  const dispatch = useDispatch()
+  const selectedTaskId = useSelector((state) => state.ui.selectedTaskId)
+  const activeView = useSelector((state) => state.ui.activeView)
+  const isSidePanelOpen = useSelector((state) => state.ui.isSidePanelOpen)
+  const isAuthenticated = useSelector((state) => state.user.isAuthenticated)
+  const token = useSelector((state) => state.user.token)
+  const currentUser = useSelector((state) => state.user.currentUser)
+  const currentBoardId = useSelector((state) => state.board.currentBoardId)
+  const lastAppliedRemoteAt = useRef(0)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const hydrate = async () => {
+      const local = loadLocalSnapshot()
+      if (local?.board && local?.tasks) {
+        dispatch(boardActions.hydrateBoardState(local.board))
+        dispatch(taskActions.hydrateTasksState(local.tasks))
+      }
+
+      try {
+        const state = local?.board?.currentBoardId ? local.board : null
+        const boardId = state?.currentBoardId ?? 'board-flow'
+        const response = await fetch(`/api/boards/${boardId}/state`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        const remote = await response.json()
+        if (remote?.board && remote?.tasks) {
+          lastAppliedRemoteAt.current = remote.savedAt ?? Date.now()
+          rememberRemoteSnapshot(remote)
+          dispatch({ ...boardActions.hydrateBoardState(remote.board), meta: { skipPersist: true } })
+          dispatch({ ...taskActions.hydrateTasksState(remote.tasks), meta: { skipPersist: true } })
+        }
+      } catch {
+        // Local snapshot already keeps the app usable offline.
+      }
+    }
+
+    hydrate()
+  }, [dispatch, isAuthenticated, token])
+
+  useEffect(() => {
+    if (!isAuthenticated || !token || !currentBoardId) return
+    const realtimeFallbackEnabled = import.meta.env.PROD && import.meta.env.VITE_ENABLE_REALTIME !== 'true'
+
+    if (!realtimeFallbackEnabled) return
+
+    const pollRemoteSnapshot = async () => {
+      if (document.visibilityState !== 'visible') return
+      const response = await fetch(`/api/boards/${currentBoardId}/state`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const remote = await response.json()
+      if (!remote?.board || !remote?.tasks) return
+
+      const remoteSavedAt = remote.savedAt ?? 0
+      const localWriteAt = lastLocalWriteAt()
+      const remoteIsNewer = remoteSavedAt > Math.max(lastAppliedRemoteAt.current, localWriteAt)
+
+      if (remoteIsNewer) {
+        lastAppliedRemoteAt.current = remoteSavedAt
+        rememberRemoteSnapshot(remote)
+        dispatch({ ...boardActions.hydrateBoardState(remote.board), meta: { skipPersist: true } })
+        dispatch({ ...taskActions.hydrateTasksState(remote.tasks), meta: { skipPersist: true } })
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      pollRemoteSnapshot().catch(() => {})
+    }, 3500)
+    pollRemoteSnapshot().catch(() => {})
+
+    return () => window.clearInterval(intervalId)
+  }, [currentBoardId, dispatch, isAuthenticated, token])
+
+  useEffect(() => {
+    const flush = () => flushOfflineQueue({ user: { token: localStorage.getItem('flowboard:token') } })
+    window.addEventListener('online', flush)
+    flush()
+    return () => window.removeEventListener('online', flush)
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      const target = event.target
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName)
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+        event.preventDefault()
+        dispatch({ type: 'history/undo' })
+      }
+      if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) {
+        event.preventDefault()
+        dispatch({ type: 'history/redo' })
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        dispatch(uiActions.toggleCommandPalette())
+      }
+      if (event.key === '/' && !isTyping) {
+        event.preventDefault()
+        document.getElementById('quick-add-input')?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [dispatch])
+
+  useEffect(() => {
+    if (!currentUser?._id) return
+    const handlePointerMove = (event) => {
+      dispatch(
+        presenceActions.cursorMoved({
+          userId: currentUser?._id,
+          cursor: {
+            x: Math.round((event.clientX / window.innerWidth) * 100),
+            y: Math.round((event.clientY / window.innerHeight) * 100),
+          },
+        }),
+      )
+    }
+    window.addEventListener('pointermove', handlePointerMove)
+    return () => window.removeEventListener('pointermove', handlePointerMove)
+  }, [dispatch, currentUser?._id])
+
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.data.current?.type !== 'task') return
+    const taskId = active.id
+    const toColumnId = over.data.current?.columnId ?? over.id
+    const fromColumnId = active.data.current.columnId
+    if (toColumnId && toColumnId !== fromColumnId) {
+      dispatch(markUndoable(taskActions.moveTask({ taskId, fromColumnId, toColumnId })))
+    }
+  }
+
+  return (
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      {!isAuthenticated ? (
+        <AuthGate />
+      ) : (
+      <main className={`app-shell ${isSidePanelOpen ? 'panel-open' : ''}`}>
+        <TopBar />
+        <section className="workspace">
+          <DashboardSidebar />
+          {activeView === 'analytics' ? <AnalyticsDashboard /> : activeView === 'workspace' ? <WorkspacePanel /> : <BoardCanvas />}
+          <SidePanel />
+        </section>
+
+        {selectedTaskId && <TaskModal taskId={selectedTaskId} />}
+      </main>
+      )}
+    </DndContext>
+  )
+}
+
+```
+
+===== FILE: src\components\ActivityFeed\ActivityFeed.jsx =====
+```
+import { Bell } from 'lucide-react'
+import { useSelector } from 'react-redux'
+import { Avatar } from '../common/Avatar.jsx'
+
+const labels = {
+  created_task: 'created',
+  deleted_task: 'deleted',
+  updated_task: 'updated',
+  moved_task: 'moved',
+  created_column: 'created column',
+  renamed_column: 'renamed column',
+  reviewed_task: 'reviewed',
+}
+
+export function ActivityFeed() {
+  const entries = useSelector((state) => state.activity.entries.slice(0, 7))
+  const unreadCount = useSelector((state) => state.activity.unreadCount)
+  const users = useSelector((state) => state.presence.onlineUsers)
+
+  return (
+    <section className="panel activity-panel">
+      <div className="panel-header">
+        <h2>
+          <Bell size={18} /> Activity
+        </h2>
+        <span>{unreadCount} new</span>
+      </div>
+      <div className="activity-list">
+        <div className="date-divider">Today</div>
+        {entries.map((entry) => (
+          <div className="activity-item" key={entry.id}>
+            <Avatar
+              name={entry.userName}
+              color={users.find((user) => user.userId === entry.userId)?.avatarColor ?? '#64748b'}
+              size={20}
+            />
+            <div>
+              <p>
+                <strong>{entry.userName}</strong> {labels[entry.action] ?? entry.action} <strong>{entry.targetTitle}</strong>
+              </p>
+              <small>{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+```
+
+===== FILE: src\components\Analytics\AnalyticsDashboard.jsx =====
+```
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+
+const burndown = [
+  { day: 'Mon', tasks: 18 },
+  { day: 'Tue', tasks: 15 },
+  { day: 'Wed', tasks: 13 },
+  { day: 'Thu', tasks: 9 },
+  { day: 'Fri', tasks: 6 },
+]
+
+const velocity = [
+  { day: 'Mon', done: 2 },
+  { day: 'Tue', done: 3 },
+  { day: 'Wed', done: 1 },
+  { day: 'Thu', done: 4 },
+]
+
+export function AnalyticsDashboard() {
+  return (
+    <section className="analytics-dashboard">
+      <article className="metric-card">
+        <span>Burndown</span>
+        <ResponsiveContainer width="100%" height={230}>
+          <LineChart data={burndown}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="day" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="tasks" stroke="#2563eb" strokeWidth={3} />
+          </LineChart>
+        </ResponsiveContainer>
+      </article>
+      <article className="metric-card">
+        <span>Velocity</span>
+        <ResponsiveContainer width="100%" height={230}>
+          <BarChart data={velocity}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="day" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="done" fill="#16a34a" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </article>
+      <article className="metric-card">
+        <span>Activity heatmap</span>
+        <div className="heatmap-grid">
+          {Array.from({ length: 35 }).map((_, index) => (
+            <span key={index} className={`heat-cell level-${index % 4}`} />
+          ))}
+        </div>
+      </article>
+      <article className="metric-card">
+        <span>Bottleneck indicator</span>
+        {[
+          ['Backlog', 35],
+          ['In progress', 84],
+          ['Review', 54],
+          ['Done', 18],
+        ].map(([label, value]) => (
+          <div className="bottleneck-row" key={label}>
+            <strong>{label}</strong>
+            <span>
+              <i style={{ width: `${value}%` }} />
+            </span>
+          </div>
+        ))}
+      </article>
+    </section>
+  )
+}
+
+```
+
+===== FILE: src\components\Analytics\AnalyticsPanel.jsx =====
+```
+import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts'
+import { useSelector } from 'react-redux'
+import { taskSelectors } from '../../store/taskSlice.js'
+
+export function AnalyticsPanel() {
+  const tasks = useSelector(taskSelectors.selectAll)
+  const total = tasks.length
+  const done = tasks.filter((task) => task.columnId === 'col-done').length
+  const high = tasks.filter((task) => task.priority === 'high').length
+  const chart = [
+    { name: 'Mon', open: total + 4 },
+    { name: 'Tue', open: total + 2 },
+    { name: 'Wed', open: total + 1 },
+    { name: 'Thu', open: total - done },
+  ]
+
+  return (
+    <div className="analytics-strip">
+      <div>
+        <strong>{Math.round((done / Math.max(total, 1)) * 100)}%</strong>
+        <span>done</span>
+      </div>
+      <div>
+        <strong>{high}</strong>
+        <span>high priority</span>
+      </div>
+      <div className="mini-chart">
+        <ResponsiveContainer width="100%" height={42}>
+          <AreaChart data={chart}>
+            <Tooltip />
+            <Area type="monotone" dataKey="open" stroke="#2563eb" fill="#bfdbfe" strokeWidth={2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\components\Auth\AuthGate.jsx =====
+```
+import { KanbanSquare, LogIn, Sparkles, UserPlus } from 'lucide-react'
+import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { userActions } from '../../store/userSlice.js'
+
+export function AuthGate() {
+  const dispatch = useDispatch()
+  const status = useSelector((state) => state.user.authStatus)
+  const error = useSelector((state) => state.user.authError)
+  const [mode, setMode] = useState('login')
+  const [form, setForm] = useState({
+    name: 'Kafee',
+    email: 'kafee@example.com',
+    password: 'password123',
+  })
+
+  const submit = async (event) => {
+    event.preventDefault()
+    dispatch(userActions.authStarted())
+
+    try {
+      const response = await fetch(`/api/auth/${mode === 'login' ? 'login' : 'signup'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error ?? 'Authentication failed')
+      dispatch(userActions.authSucceeded(payload))
+    } catch (submitError) {
+      dispatch(userActions.authFailed(submitError.message))
+    }
+  }
+
+  return (
+    <main className="auth-shell">
+      <section className="auth-card">
+        <div className="auth-brand">
+          <KanbanSquare size={24} />
+          <div>
+            <strong>FlowBoard</strong>
+            <span>Collaborative Redux Kanban</span>
+          </div>
+        </div>
+        <div>
+          <h1>{mode === 'login' ? 'Welcome back' : 'Create your workspace'}</h1>
+          <p>Sign in to sync boards with MongoDB Atlas, Groq AI, realtime presence, and offline queue support.</p>
+        </div>
+        <form className="auth-form" onSubmit={submit}>
+          {mode === 'signup' && (
+            <label>
+              Name
+              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            </label>
+          )}
+          <label>
+            Email
+            <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={form.password}
+              onChange={(event) => setForm({ ...form, password: event.target.value })}
+              minLength={6}
+            />
+          </label>
+          {error && <p className="auth-error">{error}</p>}
+          <button className="toolbar-button primary" disabled={status === 'loading'}>
+            {mode === 'login' ? <LogIn size={16} /> : <UserPlus size={16} />}
+            {status === 'loading' ? 'Working...' : mode === 'login' ? 'Log in' : 'Create account'}
+          </button>
+        </form>
+        <button className="auth-switch" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
+          <Sparkles size={15} />
+          {mode === 'login' ? 'Need an account? Sign up' : 'Already have an account? Log in'}
+        </button>
+      </section>
+    </main>
+  )
+}
+
+```
+
+===== FILE: src\components\Board\AddColumnButton.jsx =====
+```
+import { Plus } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { markUndoable } from '../../store/actionCreators.js'
+import { boardActions } from '../../store/boardSlice.js'
+import { createId } from '../../store/id.js'
+
+export function AddColumnButton() {
+  const dispatch = useDispatch()
+  const boardId = useSelector((state) => state.board.currentBoardId)
+  const order = useSelector((state) => state.board.columnOrder.length)
+
+  const addColumn = () => {
+    dispatch(
+      markUndoable(
+        boardActions.addColumn({
+          _id: createId('col'),
+          boardId,
+          title: 'New column',
+          order,
+          taskIds: [],
+        }),
+      ),
+    )
+  }
+
+  return (
+    <button className="add-column-button" onClick={addColumn}>
+      <Plus size={18} />
+      Add column
+    </button>
+  )
+}
+
+```
+
+===== FILE: src\components\Board\Board.jsx =====
+```
+import { useSelector } from 'react-redux'
+import { selectColumnsInOrder } from '../../store/boardSlice.js'
+import { Column } from './Column.jsx'
+
+export function Board() {
+  const columns = useSelector(selectColumnsInOrder)
+
+  return (
+    <div className="board" aria-label="Kanban board">
+      {columns.map((column) => (
+        <Column key={column._id} column={column} />
+      ))}
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\components\Board\BoardCanvas.jsx =====
+```
+import { useDispatch, useSelector } from 'react-redux'
+import { useState } from 'react'
+import { ChevronLeft, ChevronRight, Filter, Plus, Search } from 'lucide-react'
+import { boardActions, selectBoard, selectColumnsInOrder } from '../../store/boardSlice.js'
+import { markUndoable } from '../../store/actionCreators.js'
+import { createId } from '../../store/id.js'
+import { uiActions } from '../../store/uiSlice.js'
+import { AddColumnButton } from './AddColumnButton.jsx'
+import { Column } from './Column.jsx'
+import { LiveCursor } from './LiveCursor.jsx'
+
+export function BoardCanvas() {
+  const dispatch = useDispatch()
+  const columns = useSelector(selectColumnsInOrder)
+  const board = useSelector(selectBoard)
+  const boardCount = useSelector((state) => Object.keys(state.board.boardsById).length)
+  const currentUser = useSelector((state) => state.user.currentUser)
+  const tasks = useSelector((state) => Object.values(state.tasks.entities).filter((task) => task.boardId === state.board.currentBoardId))
+  const remoteUsers = useSelector((state) => state.presence.onlineUsers.filter((user) => user.userId !== state.user.currentUser?._id))
+  const selectedDate = useSelector((state) => state.ui.selectedDate)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const doneCount = tasks.filter((task) => task.columnId === 'col-done').length
+  const formattedDate = new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
+  const createNewBoard = () => {
+    const boardId = createId('board')
+    const starterColumns = ['Backlog', 'In Progress', 'Review', 'Done'].map((title, order) => ({
+      _id: createId('col'),
+      boardId,
+      title,
+      order,
+      taskIds: [],
+    }))
+    dispatch(
+      markUndoable(
+        boardActions.createBoard({
+          board: {
+            _id: boardId,
+            title: `Untitled Board ${boardCount + 1}`,
+            ownerId: currentUser?._id,
+            members: currentUser?._id ? [currentUser._id] : [],
+            columns: starterColumns.map((column) => column._id),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          columns: starterColumns,
+        }),
+      ),
+    )
+    dispatch(uiActions.setActiveSidebarItem('Projects'))
+    dispatch(uiActions.setActiveView('board'))
+  }
+
+  return (
+    <section className="board-canvas" aria-label="Board canvas">
+      <div className="board-dashboard-header">
+        <div className="project-title-block">
+          <span>Projects / FlowBoard</span>
+          <h1>{board.title}</h1>
+        </div>
+        <div className="date-switcher">
+          <button className="icon-button compact ghost" title="Previous day" onClick={() => dispatch(uiActions.shiftSelectedDate(-1))}>
+            <ChevronLeft size={15} />
+          </button>
+          <strong>{formattedDate}</strong>
+          <button className="icon-button compact ghost" title="Next day" onClick={() => dispatch(uiActions.shiftSelectedDate(1))}>
+            <ChevronRight size={15} />
+          </button>
+        </div>
+        <button className="toolbar-button primary" onClick={createNewBoard}>
+          <Plus size={16} /> New Board
+        </button>
+      </div>
+      <div className="board-stat-row">
+        <div className="board-stat participants">
+          <span>Participants</span>
+          <strong>{remoteUsers.length + 1} live</strong>
+        </div>
+        <div className="board-stat">
+          <span>Time</span>
+          <strong>1:40</strong>
+          <small>to review</small>
+        </div>
+        <div className="board-stat">
+          <span>Activity</span>
+          <strong>{Math.round((doneCount / Math.max(tasks.length, 1)) * 100)}%</strong>
+          <small>done</small>
+        </div>
+        <div className="board-filter-bar">
+          <Search size={15} />
+          <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search tasks" />
+          <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} aria-label="Filter by priority">
+            <option value="all">All priorities</option>
+            <option value="high">High priority</option>
+            <option value="medium">Medium priority</option>
+            <option value="low">Low priority</option>
+          </select>
+          <button onClick={() => {
+            setSearchQuery('')
+            setPriorityFilter('all')
+          }}>
+            <Filter size={15} /> Reset
+          </button>
+        </div>
+      </div>
+      <div className="board-scroll">
+        {columns.map((column) => (
+          <Column key={column._id} column={column} searchQuery={searchQuery} priorityFilter={priorityFilter} />
+        ))}
+        <AddColumnButton />
+      </div>
+      {remoteUsers.map((user) => (
+        <LiveCursor key={user.userId} user={user} />
+      ))}
+    </section>
+  )
+}
+
+```
+
+===== FILE: src\components\Board\Column.jsx =====
+```
+import { useDroppable } from '@dnd-kit/core'
+import { AnimatePresence, motion as Motion, useReducedMotion } from 'framer-motion'
+import { MoreHorizontal, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { markUndoable } from '../../store/actionCreators.js'
+import { boardActions } from '../../store/boardSlice.js'
+import { createId } from '../../store/id.js'
+import { selectTasksByColumn, taskActions } from '../../store/taskSlice.js'
+import { TaskCard } from './TaskCard.jsx'
+
+export function Column({ column, searchQuery = '', priorityFilter = 'all' }) {
+  const dispatch = useDispatch()
+  const prefersReducedMotion = useReducedMotion()
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [title, setTitle] = useState(column.title)
+  const tasks = useSelector((state) => selectTasksByColumn(state, column._id))
+  const visibleTasks = tasks.filter((task) => {
+    const query = searchQuery.trim().toLowerCase()
+    const matchesSearch =
+      !query ||
+      task.title.toLowerCase().includes(query) ||
+      task.description.toLowerCase().includes(query) ||
+      task.labels.some((label) => label.text.toLowerCase().includes(query))
+    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
+    return matchesSearch && matchesPriority
+  })
+  const currentUser = useSelector((state) => state.user.currentUser)
+  const { setNodeRef, isOver } = useDroppable({
+    id: column._id,
+    data: { columnId: column._id },
+  })
+
+  const addTask = () => {
+    const task = {
+      _id: createId('task'),
+      boardId: column.boardId,
+      columnId: column._id,
+      title: 'New task',
+      description: 'Add details, subtasks, labels, and priority.',
+      subtasks: [],
+      labels: [{ text: 'New', color: '#4f46e5' }],
+      priority: 'medium',
+      dueDate: null,
+      assigneeIds: currentUser?._id ? [currentUser._id] : [],
+      createdBy: currentUser?._id,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    dispatch(markUndoable(taskActions.addTask(task)))
+  }
+
+  const commitRename = () => {
+    setIsRenaming(false)
+    if (title.trim() && title !== column.title) {
+      dispatch(markUndoable(boardActions.renameColumn({ columnId: column._id, title: title.trim() })))
+    }
+  }
+
+  const removeColumn = () => {
+    if (tasks.length > 0) return
+    dispatch(markUndoable(boardActions.removeColumn({ columnId: column._id })))
+  }
+
+  return (
+    <section ref={setNodeRef} className={`column ${isOver ? 'column-over' : ''}`}>
+      <div className="column-header">
+        <div className="column-title-wrap">
+          {isRenaming ? (
+            <input
+              className="column-title-input"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(event) => event.key === 'Enter' && commitRename()}
+              autoFocus
+            />
+          ) : (
+            <button className="column-title-button" onClick={() => setIsRenaming(true)}>
+              {column.title}
+            </button>
+          )}
+          <span>{visibleTasks.length}</span>
+        </div>
+        <div className="column-tools">
+          <button className="icon-button compact ghost" onClick={addTask} title="Add task" aria-label={`Add task to ${column.title}`}>
+            <Plus size={15} />
+          </button>
+          <button className="icon-button compact ghost" onClick={removeColumn} disabled={tasks.length > 0} title={tasks.length > 0 ? 'Move or delete tasks first' : 'Delete empty column'}>
+            <MoreHorizontal size={15} />
+          </button>
+        </div>
+      </div>
+      <div className="task-list">
+        <AnimatePresence initial={false} mode="popLayout">
+          {visibleTasks.map((task) => (
+            <TaskCard key={task._id} task={task} />
+          ))}
+        </AnimatePresence>
+        {visibleTasks.length === 0 && (
+          <Motion.div
+            className="empty-drop-zone"
+            initial={prefersReducedMotion ? false : { opacity: 0, height: 0 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, height: 80 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+          >
+            {tasks.length === 0 ? 'Drop here' : 'No matching tasks'}
+          </Motion.div>
+        )}
+      </div>
+      <button className="add-task-ghost" onClick={addTask}>
+        <Plus size={15} /> Add task
+      </button>
+    </section>
+  )
+}
+
+```
+
+===== FILE: src\components\Board\LiveCursor.jsx =====
+```
+import { Avatar } from '../common/Avatar.jsx'
+
+export function LiveCursor({ user }) {
+  if (!user.cursor) return null
+
+  return (
+    <div className="live-cursor" style={{ left: `${user.cursor.x}%`, top: `${user.cursor.y}%`, '--cursor-color': user.avatarColor }}>
+      <span className="cursor-arrow" />
+      <span className="cursor-label">
+        <Avatar name={user.name} color={user.avatarColor} size={18} />
+        {user.name}
+      </span>
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\components\Board\TaskCard.jsx =====
+```
+import { useDraggable } from '@dnd-kit/core'
+import { motion as Motion, useReducedMotion } from 'framer-motion'
+import { ArrowLeft, ArrowRight, Calendar, CheckSquare, GripVertical, Sparkles, Trash2 } from 'lucide-react'
+import { forwardRef } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { markUndoable } from '../../store/actionCreators.js'
+import { selectColumnsInOrder } from '../../store/boardSlice.js'
+import { presenceActions } from '../../store/presenceSlice.js'
+import { taskActions } from '../../store/taskSlice.js'
+import { uiActions } from '../../store/uiSlice.js'
+import { Avatar } from '../common/Avatar.jsx'
+
+const priorityLabels = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+}
+
+const SPRING = { type: 'spring', stiffness: 420, damping: 38, mass: 1 }
+
+function TaskCardComponent({ task }, forwardedRef) {
+  const dispatch = useDispatch()
+  const prefersReducedMotion = useReducedMotion()
+  const columns = useSelector(selectColumnsInOrder)
+  const editingUserId = useSelector((state) => state.presence.editingMap[task._id])
+  const editingUser = useSelector((state) => state.presence.onlineUsers.find((user) => user.userId === editingUserId))
+  const users = useSelector((state) => state.presence.onlineUsers)
+  const currentUser = useSelector((state) => state.user.currentUser)
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task._id,
+    data: { type: 'task', columnId: task.columnId },
+  })
+  const columnIndex = columns.findIndex((column) => column._id === task.columnId)
+
+  const moveTo = (offset) => {
+    const target = columns[columnIndex + offset]
+    if (target) {
+      dispatch(markUndoable(taskActions.moveTask({ taskId: task._id, fromColumnId: task.columnId, toColumnId: target._id })))
+    }
+  }
+
+  const openTask = () => {
+    dispatch(presenceActions.startedEditingTask({ taskId: task._id, userId: currentUser?._id }))
+    dispatch(uiActions.selectTask(task._id))
+  }
+
+  const completed = task.subtasks.filter((subtask) => subtask.done).length
+  const assignees = task.assigneeIds.map((id) => users.find((user) => user.userId === id)).filter(Boolean)
+  const isAiAssisted = task.labels.some((label) => label.text.toLowerCase().includes('ai'))
+  const dragStyle = prefersReducedMotion
+    ? undefined
+    : {
+        x: transform?.x ?? 0,
+        y: transform?.y ?? 0,
+      }
+
+  return (
+    <Motion.article
+      ref={(node) => {
+        setNodeRef(node)
+        if (typeof forwardedRef === 'function') forwardedRef(node)
+        else if (forwardedRef) forwardedRef.current = node
+      }}
+      layout
+      layoutId={task._id}
+      style={dragStyle}
+      initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: isDragging ? 1.03 : 1, rotate: isDragging && !prefersReducedMotion ? -1.2 : 0 }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+      transition={prefersReducedMotion ? { duration: 0 } : { x: { duration: 0 }, y: { duration: 0 }, default: SPRING }}
+      {...attributes}
+      {...listeners}
+      className={`task-card priority-edge-${task.priority} ${isDragging ? 'dragging' : ''}`}
+    >
+      {editingUser && editingUser.userId !== currentUser?._id && <div className="editing-badge">{editingUser.name} editing</div>}
+      <div className="card-drag" aria-hidden="true">
+        <GripVertical size={16} />
+      </div>
+      <button className="card-body" onClick={openTask}>
+        <div className="card-title-row">
+          <h3>{task.title}</h3>
+          {isAiAssisted && (
+            <span className="ai-corner" title="AI-assisted">
+              <Sparkles size={13} />
+            </span>
+          )}
+        </div>
+        <div className="label-row">
+          <span className={`priority ${task.priority}`}>{priorityLabels[task.priority]}</span>
+          {task.labels.map((label) => (
+            <span key={label.text} className="label" style={{ '--label': label.color }}>
+              {label.text}
+            </span>
+          ))}
+        </div>
+        <div className="card-meta">
+          {task.subtasks.length > 0 ? (
+            <span>
+              <CheckSquare size={14} /> {completed}/{task.subtasks.length}
+            </span>
+          ) : task.dueDate ? (
+            <span>
+              <Calendar size={14} /> {task.dueDate}
+            </span>
+          ) : (
+            <span>No due date</span>
+          )}
+          <span className="mini-avatar-stack">
+            {assignees.map((user) => (
+              <Avatar key={user.userId} name={user.name} color={user.avatarColor} size={22} />
+            ))}
+          </span>
+        </div>
+      </button>
+      <div className="card-actions">
+        <button className="icon-button ghost" onClick={() => moveTo(-1)} disabled={columnIndex === 0} title="Move left">
+          <ArrowLeft size={15} />
+        </button>
+        <button
+          className="icon-button ghost danger"
+          onClick={() => dispatch(markUndoable(taskActions.deleteTask(task._id)))}
+          title="Delete task"
+        >
+          <Trash2 size={15} />
+        </button>
+        <button className="icon-button ghost" onClick={() => moveTo(1)} disabled={columnIndex === columns.length - 1} title="Move right">
+          <ArrowRight size={15} />
+        </button>
+      </div>
+    </Motion.article>
+  )
+}
+
+export const TaskCard = forwardRef(TaskCardComponent)
+
+```
+
+===== FILE: src\components\common\Avatar.jsx =====
+```
+export function Avatar({ name, color, size = 26, className = '', title }) {
+  const initial = name?.slice(0, 1).toUpperCase() ?? '?'
+
+  return (
+    <span
+      className={`avatar ${className}`}
+      style={{ '--avatar-color': color, width: size, height: size }}
+      title={title ?? name}
+      aria-label={name}
+    >
+      {initial}
+    </span>
+  )
+}
+
+```
+
+===== FILE: src\components\History\HistoryPanel.jsx =====
+```
+import { GitBranch, History } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { UndoRedoButtons } from './UndoRedoButtons.jsx'
+
+export function HistoryPanel() {
+  const dispatch = useDispatch()
+  const { past, future, branches } = useSelector((state) => state.history)
+  const currentEntryId = past.at(-1)?.id
+
+  return (
+    <section className="panel history-panel">
+      <div className="panel-header">
+        <h2>
+          <History size={18} /> Timeline
+        </h2>
+        <span>{past.length} actions</span>
+      </div>
+      <UndoRedoButtons />
+      <div className="timeline">
+        {past.length === 0 && <p className="empty-text">Make a board change to start the reversible action stream.</p>}
+        {[...past].reverse().map((entry) => (
+          <button
+            className={`timeline-item ${entry.id === currentEntryId ? 'current' : ''}`}
+            key={entry.id}
+            onClick={() => dispatch({ type: 'history/jumpTo', payload: entry.id })}
+            title="Jump to this point"
+          >
+            <span className="timeline-dot" />
+            <div>
+              <strong>{entry.description}</strong>
+              <small>
+                {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {entry.id === currentEntryId ? ' - you are here' : ''}
+              </small>
+            </div>
+          </button>
+        ))}
+      </div>
+      {(future.length > 0 || Object.keys(branches).length > 0) && (
+        <div className="branch-note">
+          <GitBranch size={15} />
+          {future.length} redo action{future.length === 1 ? '' : 's'} available, {Object.keys(branches).length} branch point
+          {Object.keys(branches).length === 1 ? '' : 's'} preserved.
+        </div>
+      )}
+    </section>
+  )
+}
+
+```
+
+===== FILE: src\components\History\UndoRedoButtons.jsx =====
+```
+import { RotateCcw, RotateCw } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+
+export function UndoRedoButtons({ compact = false }) {
+  const dispatch = useDispatch()
+  const pastCount = useSelector((state) => state.history.past.length)
+  const futureCount = useSelector((state) => state.history.future.length)
+
+  return (
+    <div className={compact ? 'top-icon-group' : 'segmented-actions'}>
+      <button className={compact ? 'icon-button compact' : 'toolbar-button'} onClick={() => dispatch({ type: 'history/undo' })} disabled={!pastCount} title="Undo">
+        <RotateCcw size={17} /> {!compact && 'Undo'}
+      </button>
+      <button className={compact ? 'icon-button compact' : 'toolbar-button'} onClick={() => dispatch({ type: 'history/redo' })} disabled={!futureCount} title="Redo">
+        <RotateCw size={17} /> {!compact && 'Redo'}
+      </button>
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\components\Layout\DashboardSidebar.jsx =====
+```
+import { BarChart3, CalendarDays, FolderKanban, HelpCircle, Inbox, Layers, Settings, Users } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { uiActions } from '../../store/uiSlice.js'
+import { Avatar } from '../common/Avatar.jsx'
+
+const navItems = [
+  ['Dashboard', <BarChart3 size={16} />],
+  ['Inbox', <Inbox size={16} />],
+  ['Calendar', <CalendarDays size={16} />],
+  ['Projects', <FolderKanban size={16} />],
+  ['Collaborators', <Users size={16} />],
+  ['Components', <Layers size={16} />],
+  ['Settings', <Settings size={16} />],
+  ['Help Center', <HelpCircle size={16} />],
+]
+
+export function DashboardSidebar() {
+  const dispatch = useDispatch()
+  const user = useSelector((state) => state.user.currentUser)
+  const activeSidebarItem = useSelector((state) => state.ui.activeSidebarItem)
+
+  const handleNavigate = (label) => {
+    dispatch(uiActions.setActiveSidebarItem(label))
+    if (label === 'Dashboard') {
+      dispatch(uiActions.setActiveView('analytics'))
+      return
+    }
+    if (label === 'Projects') {
+      dispatch(uiActions.setActiveView('board'))
+      return
+    }
+    dispatch(uiActions.setActiveView('workspace'))
+  }
+
+  return (
+    <aside className="dashboard-sidebar">
+      <div className="sidebar-logo">
+        <FolderKanban size={18} />
+        <div>
+          <strong>FlowBoard</strong>
+          <span>Workspace</span>
+        </div>
+      </div>
+      <nav className="sidebar-nav" aria-label="Workspace navigation">
+        {navItems.map(([label, icon]) => (
+          <button key={label} className={activeSidebarItem === label ? 'active' : ''} onClick={() => handleNavigate(label)}>
+            {icon}
+            {label}
+          </button>
+        ))}
+      </nav>
+      <div className="sidebar-footer">
+        <Avatar name={user.name} color={user.avatarColor} size={30} />
+        <div>
+          <strong>{user.name}</strong>
+          <span>{user.email}</span>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+```
+
+===== FILE: src\components\Layout\WorkspacePanel.jsx =====
+```
+import { Bell, CalendarDays, HelpCircle, Inbox, Layers, Settings, Users } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { uiActions } from '../../store/uiSlice.js'
+import { Avatar } from '../common/Avatar.jsx'
+
+const viewConfig = {
+  Inbox: {
+    icon: Inbox,
+    title: 'Inbox',
+    text: 'Recent activity, mentions, and incoming board updates are collected here.',
+    action: 'Open activity',
+    tab: 'activity',
+  },
+  Calendar: {
+    icon: CalendarDays,
+    title: 'Calendar',
+    text: 'Use this area to review due dates and plan board work by day.',
+    action: 'Show history',
+    tab: 'history',
+  },
+  Collaborators: {
+    icon: Users,
+    title: 'Collaborators',
+    text: 'Online teammates, live cursors, and editing presence are tracked from this workspace.',
+    action: 'Open activity',
+    tab: 'activity',
+  },
+  Components: {
+    icon: Layers,
+    title: 'Components',
+    text: 'Reusable cards, labels, task templates, and board building blocks will live here.',
+    action: 'Back to board',
+  },
+  Settings: {
+    icon: Settings,
+    title: 'Settings',
+    text: 'Workspace preferences, theme controls, and profile settings can be configured here.',
+    action: 'Back to board',
+  },
+  'Help Center': {
+    icon: HelpCircle,
+    title: 'Help Center',
+    text: 'Keyboard shortcuts: Ctrl+Z undo, Ctrl+Y redo, / focuses Quick Add, Ctrl+K opens commands.',
+    action: 'Back to board',
+  },
+}
+
+export function WorkspacePanel() {
+  const dispatch = useDispatch()
+  const activeSidebarItem = useSelector((state) => state.ui.activeSidebarItem)
+  const selectedDate = useSelector((state) => state.ui.selectedDate)
+  const currentBoardId = useSelector((state) => state.board.currentBoardId)
+  const tasks = useSelector((state) => Object.values(state.tasks.entities).filter((task) => task.boardId === state.board.currentBoardId))
+  const activity = useSelector((state) => state.activity.entries.filter((entry) => entry.boardId === state.board.currentBoardId).slice(0, 6))
+  const users = useSelector((state) => state.presence.onlineUsers)
+  const currentUser = useSelector((state) => state.user.currentUser)
+  const config = viewConfig[activeSidebarItem] ?? viewConfig.Inbox
+  const Icon = config.icon
+  const dueTasks = tasks
+    .filter((task) => task.dueDate)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 8)
+  const labels = [...new Map(tasks.flatMap((task) => task.labels).map((label) => [label.text, label])).values()]
+  const highPriorityCount = tasks.filter((task) => task.priority === 'high').length
+
+  const handleAction = () => {
+    if (config.tab) {
+      dispatch(uiActions.setSidePanelTab(config.tab))
+      return
+    }
+    dispatch(uiActions.setActiveSidebarItem('Projects'))
+    dispatch(uiActions.setActiveView('board'))
+  }
+
+  const renderBody = () => {
+    if (activeSidebarItem === 'Inbox') {
+      return (
+        <div className="workspace-list">
+          {activity.map((entry) => (
+            <button key={entry.id} onClick={() => dispatch(uiActions.setSidePanelTab('activity'))}>
+              <strong>{entry.userName}</strong>
+              <span>{entry.action.replaceAll('_', ' ')}: {entry.targetTitle}</span>
+            </button>
+          ))}
+          {activity.length === 0 && <p>No inbox updates yet.</p>}
+        </div>
+      )
+    }
+
+    if (activeSidebarItem === 'Calendar') {
+      return (
+        <div className="workspace-list">
+          {dueTasks.map((task) => (
+            <button key={task._id} onClick={() => dispatch(uiActions.selectTask(task._id))}>
+              <strong>{task.dueDate}</strong>
+              <span>{task.title}</span>
+            </button>
+          ))}
+          {dueTasks.length === 0 && <p>No due dates on this board.</p>}
+        </div>
+      )
+    }
+
+    if (activeSidebarItem === 'Collaborators') {
+      return (
+        <div className="collaborator-grid">
+          {users.map((user) => (
+            <div key={user.userId} className="collaborator-row">
+              <Avatar name={user.name} color={user.avatarColor} size={30} />
+              <div>
+                <strong>{user.name}</strong>
+                <span>{user.cursor ? 'Live on board' : 'Online'}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    if (activeSidebarItem === 'Components') {
+      return (
+        <div className="workspace-chip-grid">
+          {labels.map((label) => (
+            <span key={label.text} className="label" style={{ '--label': label.color }}>{label.text}</span>
+          ))}
+          <span className="workspace-stat">{tasks.length} task templates available from current board cards</span>
+        </div>
+      )
+    }
+
+    if (activeSidebarItem === 'Settings') {
+      return (
+        <div className="workspace-list">
+          <div>
+            <strong>{currentUser?.name}</strong>
+            <span>{currentUser?.email}</span>
+          </div>
+          <div>
+            <strong>Atlas persistence</strong>
+            <span>Board state saves to MongoDB under board {currentBoardId}</span>
+          </div>
+          <div>
+            <strong>{highPriorityCount} high priority tasks</strong>
+            <span>Use filters on the board to focus urgent work.</span>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="workspace-list">
+        {['Ctrl+Z undo', 'Ctrl+Y redo', '/ focus quick add', 'Ctrl+K command palette'].map((shortcut) => (
+          <div key={shortcut}>
+            <strong>{shortcut}</strong>
+            <span>Available across the board workspace.</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <section className="workspace-panel">
+      <div className="workspace-panel-card">
+        <Icon size={28} />
+        <span>{selectedDate}</span>
+        <h1>{config.title}</h1>
+        <p>{config.text}</p>
+        {renderBody()}
+        <button className="toolbar-button primary" onClick={handleAction}>
+          {config.tab && <Bell size={16} />}
+          {config.action}
+        </button>
+      </div>
+    </section>
+  )
+}
+
+```
+
+===== FILE: src\components\Presence\PresenceAvatars.jsx =====
+```
+import { Radio } from 'lucide-react'
+import { useSelector } from 'react-redux'
+import { Avatar } from '../common/Avatar.jsx'
+
+export function PresenceAvatars() {
+  const users = useSelector((state) => state.presence.onlineUsers)
+  const visibleUsers = users.slice(0, 4)
+  const overflow = users.length - visibleUsers.length
+
+  return (
+    <div className="presence">
+      <Radio size={17} />
+      <div className="avatar-stack">
+        {visibleUsers.map((user) => (
+          <Avatar key={user.userId} name={user.name} color={user.avatarColor} size={26} />
+        ))}
+        {overflow > 0 && <span className="avatar overflow">+{overflow}</span>}
+      </div>
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\components\QuickAdd\QuickAddInput.jsx =====
+```
+import { Check, Sparkles, X } from 'lucide-react'
+import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { aiActions } from '../../store/aiSlice.js'
+import { markUndoable } from '../../store/actionCreators.js'
+import { createId } from '../../store/id.js'
+import { taskActions } from '../../store/taskSlice.js'
+
+export function QuickAddInput({ compact = false }) {
+  const dispatch = useDispatch()
+  const [text, setText] = useState('')
+  const suggestion = useSelector((state) => state.ai.lastSuggestion)
+  const status = useSelector((state) => state.ai.status)
+  const currentBoardId = useSelector((state) => state.board.currentBoardId)
+  const currentUser = useSelector((state) => state.user.currentUser)
+
+  const parse = async () => {
+    if (!text.trim()) return
+    dispatch(aiActions.requestStarted())
+
+    try {
+      const response = await fetch('/api/ai/parse-nl-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!response.ok) throw new Error(`Request failed with ${response.status}`)
+      const result = await response.json()
+      dispatch(aiActions.requestSucceeded(result))
+    } catch (error) {
+      dispatch(aiActions.requestFailed(error.message))
+    }
+  }
+
+  const confirm = () => {
+    const task = {
+      _id: createId('task'),
+      boardId: currentBoardId,
+      columnId: 'col-backlog',
+      title: suggestion.title,
+      description: 'Created from AI-assisted natural language quick add.',
+      subtasks: [],
+      labels: [{ text: 'AI draft', color: '#7c3aed' }],
+      priority: suggestion.priority,
+      dueDate: suggestion.dueDate,
+      assigneeIds: currentUser?._id ? [currentUser._id] : [],
+      createdBy: currentUser?._id,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    dispatch(markUndoable(taskActions.addTask(task)))
+    dispatch(aiActions.clearSuggestion())
+    setText('')
+  }
+
+  return (
+    <div className="quick-add">
+      <div className="quick-input">
+        <Sparkles size={18} />
+        <input
+          id="quick-add-input"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => event.key === 'Enter' && parse()}
+          placeholder="Fix navbar by Friday, high priority"
+        />
+        {!compact && (
+          <button className="toolbar-button" onClick={parse} disabled={status === 'loading'}>
+            {status === 'loading' ? 'Parsing' : 'AI Parse'}
+          </button>
+        )}
+      </div>
+      {status === 'failed' && <p className="empty-text">Couldn't reach the AI service - try again.</p>}
+      {suggestion && (
+        <div className="ai-draft">
+          <div>
+            <strong>{suggestion.title}</strong>
+            <span>{suggestion.priority} priority {suggestion.dueDate ? `- due ${suggestion.dueDate}` : ''}</span>
+          </div>
+          <button className="icon-button success" onClick={confirm} title="Confirm AI draft">
+            <Check size={17} />
+          </button>
+          <button className="icon-button ghost" onClick={() => dispatch(aiActions.clearSuggestion())} title="Discard AI draft">
+            <X size={17} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\components\SidePanel\SidePanel.jsx =====
+```
+import { X } from 'lucide-react'
+import { motion as Motion, useReducedMotion } from 'framer-motion'
+import { useDispatch, useSelector } from 'react-redux'
+import { uiActions } from '../../store/uiSlice.js'
+import { ActivityFeed } from '../ActivityFeed/ActivityFeed.jsx'
+import { HistoryPanel } from '../History/HistoryPanel.jsx'
+
+export function SidePanel() {
+  const dispatch = useDispatch()
+  const isOpen = useSelector((state) => state.ui.isSidePanelOpen)
+  const activeTab = useSelector((state) => state.ui.sidePanelTab)
+  const prefersReducedMotion = useReducedMotion()
+
+  return (
+    <Motion.aside
+      className={`side-panel ${isOpen ? 'open' : ''}`}
+      animate={prefersReducedMotion ? undefined : { x: isOpen ? 0 : 20 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 38, mass: 1 }}
+    >
+      <div className="side-panel-header">
+        <div className="panel-tabs">
+          <button
+            className={activeTab === 'history' ? 'active' : ''}
+            onClick={() => dispatch(uiActions.setSidePanelTab('history'))}
+          >
+            History
+          </button>
+          <button
+            className={activeTab === 'activity' ? 'active' : ''}
+            onClick={() => dispatch(uiActions.setSidePanelTab('activity'))}
+          >
+            Activity
+          </button>
+        </div>
+        <button className="icon-button compact ghost" onClick={() => dispatch(uiActions.closeSidePanel())} title="Close panel">
+          <X size={16} />
+        </button>
+      </div>
+      {activeTab === 'history' ? <HistoryPanel /> : <ActivityFeed />}
+    </Motion.aside>
+  )
+}
+
+```
+
+===== FILE: src\components\TaskModal\TaskModal.jsx =====
+```
+import { Calendar, GripVertical, Plus, Sparkles, Trash2, X } from 'lucide-react'
+import { motion as Motion, useReducedMotion } from 'framer-motion'
+import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { markUndoable } from '../../store/actionCreators.js'
+import { createId } from '../../store/id.js'
+import { presenceActions } from '../../store/presenceSlice.js'
+import { selectTaskById, taskActions } from '../../store/taskSlice.js'
+import { uiActions } from '../../store/uiSlice.js'
+import { selectColumnsInOrder } from '../../store/boardSlice.js'
+import { Avatar } from '../common/Avatar.jsx'
+
+export function TaskModal({ taskId }) {
+  const dispatch = useDispatch()
+  const prefersReducedMotion = useReducedMotion()
+  const task = useSelector((state) => selectTaskById(state, taskId))
+  const columns = useSelector(selectColumnsInOrder)
+  const users = useSelector((state) => state.presence.onlineUsers)
+  const currentUser = useSelector((state) => state.user.currentUser)
+  const [title, setTitle] = useState(task?.title ?? '')
+  const [description, setDescription] = useState(task?.description ?? '')
+  const [priority, setPriority] = useState(task?.priority ?? 'medium')
+  const [dueDate, setDueDate] = useState(task?.dueDate ?? '')
+  const [pendingAi, setPendingAi] = useState([])
+  const [isBreakingDown, setIsBreakingDown] = useState(false)
+  const [breakdownError, setBreakdownError] = useState(null)
+
+  if (!task) return null
+
+  const close = () => {
+    dispatch(presenceActions.stoppedEditingTask({ taskId }))
+    dispatch(uiActions.closeTask())
+  }
+
+  const save = () => {
+    dispatch(markUndoable(taskActions.updateTask({ taskId, changes: { title, description, priority, dueDate: dueDate || null } })))
+    close()
+  }
+
+  const addBreakdown = async () => {
+    setIsBreakingDown(true)
+    setBreakdownError(null)
+
+    try {
+      const response = await fetch('/api/ai/breakdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskTitle: title || task.title }),
+      })
+      if (!response.ok) throw new Error(`Request failed with ${response.status}`)
+      const { subtasks } = await response.json()
+      setPendingAi(subtasks.map((text) => ({ id: createId('suggestion'), text })))
+    } catch (error) {
+      setBreakdownError(error.message)
+    } finally {
+      setIsBreakingDown(false)
+    }
+  }
+
+  const acceptSuggestions = (accepted = pendingAi) => {
+    if (accepted.length === 0) return
+    dispatch(
+      markUndoable(
+        taskActions.setSubtasks({
+          taskId,
+          subtasks: [...task.subtasks, ...accepted.map((item) => ({ id: createId('subtask'), text: item.text, done: false }))],
+        }),
+      ),
+    )
+    setPendingAi(pendingAi.filter((item) => !accepted.some((acceptedItem) => acceptedItem.id === item.id)))
+  }
+
+  const deleteTask = () => {
+    dispatch(markUndoable(taskActions.deleteTask(taskId)))
+    close()
+  }
+
+  const addSubtask = () => {
+    const text = window.prompt('Subtask text')
+    if (!text?.trim()) return
+    dispatch(markUndoable(taskActions.addSubtask({ taskId, subtask: { id: createId('subtask'), text: text.trim(), done: false } })))
+  }
+
+  const addLabel = () => {
+    const text = window.prompt('Label name')
+    if (!text?.trim()) return
+    dispatch(markUndoable(taskActions.addLabel({ taskId, label: { text: text.trim(), color: '#2563eb' } })))
+  }
+
+  const assignSelf = () => {
+    dispatch(markUndoable(taskActions.assignUser({ taskId, userId: currentUser?._id })))
+  }
+
+  return (
+    <Motion.div
+      className="modal-backdrop"
+      role="presentation"
+      initial={prefersReducedMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+    >
+      <Motion.section
+        className="task-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit task"
+        initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.15 }}
+      >
+        <div className="modal-header">
+          <input className="modal-title-input" value={title} onChange={(event) => setTitle(event.target.value)} />
+          <button className="icon-button ghost" onClick={close} title="Close">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-control-row">
+          <select value={task.columnId} onChange={(event) => dispatch(markUndoable(taskActions.moveTask({ taskId, fromColumnId: task.columnId, toColumnId: event.target.value })))}>
+            {columns.map((column) => (
+              <option key={column._id} value={column._id}>
+                {column.title}
+              </option>
+            ))}
+          </select>
+          <select value={priority} onChange={(event) => setPriority(event.target.value)}>
+            <option value="low">Low priority</option>
+            <option value="medium">Medium priority</option>
+            <option value="high">High priority</option>
+          </select>
+          <label className="date-control">
+            <Calendar size={15} />
+            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+          </label>
+        </div>
+        <textarea
+          className="description-field"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          rows={4}
+          placeholder="Description"
+        />
+        <div className="subtask-box">
+          <div className="modal-header compact">
+            <h3>Subtasks</h3>
+            <button className="toolbar-button" onClick={addBreakdown} disabled={isBreakingDown}>
+              <Sparkles size={16} /> {isBreakingDown ? 'Thinking...' : 'Break down with AI'}
+            </button>
+          </div>
+          {breakdownError && <p className="empty-text">Couldn't reach the AI service - try again.</p>}
+          {pendingAi.length > 0 && (
+            <div className="ai-suggestions">
+              <div className="suggestion-header">
+                <strong>AI suggestions</strong>
+                <button onClick={() => acceptSuggestions()}>Accept all</button>
+              </div>
+              {pendingAi.map((item) => (
+                <div className="suggestion-row" key={item.id}>
+                  <span>{item.text}</span>
+                  <button onClick={() => acceptSuggestions([item])}>Accept</button>
+                  <button onClick={() => setPendingAi(pendingAi.filter((suggestion) => suggestion.id !== item.id))}>Reject</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {task.subtasks.length === 0 ? (
+            <p className="empty-text">No subtasks yet.</p>
+          ) : (
+            task.subtasks.map((subtask) => (
+              <label className="checkbox-row" key={subtask.id}>
+                <GripVertical size={14} />
+                <input
+                  type="checkbox"
+                  checked={subtask.done}
+                  onChange={() => dispatch(markUndoable(taskActions.toggleSubtask({ taskId, subtaskId: subtask.id })))}
+                />
+                {subtask.text}
+              </label>
+            ))
+          )}
+          <button className="add-subtask-row" onClick={addSubtask}>
+            <Plus size={15} /> Add subtask
+          </button>
+        </div>
+        <div className="modal-meta-row">
+          <span className="label" style={{ '--label': '#7c3aed' }}>
+            AI
+          </span>
+          {task.labels.map((label) => (
+            <span key={label.text} className="label" style={{ '--label': label.color }}>
+              {label.text}
+            </span>
+          ))}
+          <button className="add-chip" onClick={addLabel} title="Add label">+</button>
+        </div>
+        <div className="assignee-row">
+          {task.assigneeIds
+            .map((id) => users.find((user) => user.userId === id))
+            .filter(Boolean)
+            .map((user) => (
+              <Avatar key={user.userId} name={user.name} color={user.avatarColor} size={24} />
+            ))}
+          <button className="add-chip" onClick={assignSelf} title="Assign yourself">+</button>
+        </div>
+        <div className="modal-actions">
+          <button className="text-danger-button" onClick={deleteTask}>
+            <Trash2 size={15} /> Delete task
+          </button>
+          <span className="created-meta">Created by Kafee, 2 days ago</span>
+          <button className="toolbar-button primary" onClick={save}>
+            Save changes
+          </button>
+        </div>
+      </Motion.section>
+    </Motion.div>
+  )
+}
+
+```
+
+===== FILE: src\components\TopBar\PanelToggleButtons.jsx =====
+```
+import { Bell, History } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { uiActions } from '../../store/uiSlice.js'
+
+export function PanelToggleButtons() {
+  const dispatch = useDispatch()
+  const unreadCount = useSelector((state) => state.activity.unreadCount)
+  const activeTab = useSelector((state) => state.ui.sidePanelTab)
+  const isOpen = useSelector((state) => state.ui.isSidePanelOpen)
+
+  const openPanel = (tab) => {
+    dispatch(uiActions.setSidePanelTab(tab))
+  }
+
+  return (
+    <div className="top-icon-group">
+      <button
+        className={`icon-button compact ${isOpen && activeTab === 'history' ? 'active' : ''}`}
+        onClick={() => openPanel('history')}
+        title="History"
+      >
+        <History size={17} />
+      </button>
+      <button
+        className={`icon-button compact activity-toggle ${isOpen && activeTab === 'activity' ? 'active' : ''}`}
+        onClick={() => openPanel('activity')}
+        title="Activity"
+      >
+        <Bell size={17} />
+        {unreadCount > 0 && <span className="notification-dot" />}
+      </button>
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\components\TopBar\TopBar.jsx =====
+```
+import { BarChart3, ChevronDown, KanbanSquare } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { boardActions, selectBoard } from '../../store/boardSlice.js'
+import { taskActions } from '../../store/taskSlice.js'
+import { uiActions } from '../../store/uiSlice.js'
+import { PresenceAvatars } from '../Presence/PresenceAvatars.jsx'
+import { QuickAddInput } from '../QuickAdd/QuickAddInput.jsx'
+import { UndoRedoButtons } from '../History/UndoRedoButtons.jsx'
+import { PanelToggleButtons } from './PanelToggleButtons.jsx'
+import { UserMenu } from './UserMenu.jsx'
+
+export function TopBar() {
+  const dispatch = useDispatch()
+  const board = useSelector(selectBoard)
+  const activeView = useSelector((state) => state.ui.activeView)
+  const token = useSelector((state) => state.user.token)
+  const [boardsOpen, setBoardsOpen] = useState(false)
+  const [boards, setBoards] = useState([])
+
+  useEffect(() => {
+    if (!boardsOpen) return
+    fetch('/api/boards', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((response) => response.json())
+      .then(setBoards)
+      .catch(() => setBoards([]))
+  }, [boardsOpen, token])
+
+  const switchBoard = async (boardId) => {
+    setBoardsOpen(false)
+    const response = await fetch(`/api/boards/${boardId}/state`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    const snapshot = await response.json()
+    if (snapshot?.board && snapshot?.tasks) {
+      dispatch({ ...boardActions.hydrateBoardState(snapshot.board), meta: { skipPersist: true } })
+      dispatch({ ...taskActions.hydrateTasksState(snapshot.tasks), meta: { skipPersist: true } })
+      dispatch(uiActions.setActiveSidebarItem('Projects'))
+      dispatch(uiActions.setActiveView('board'))
+    }
+  }
+
+  return (
+    <header className="topbar">
+      <div className="topbar-left">
+        <div className="brand-mark">
+          <KanbanSquare size={18} />
+          <span>FlowBoard</span>
+        </div>
+        <span className="separator">/</span>
+        <div className="board-switcher-wrap">
+          <button className="board-switcher" onClick={() => setBoardsOpen((value) => !value)}>
+            {board.title}
+            <ChevronDown size={15} />
+          </button>
+          {boardsOpen && (
+            <div className="board-dropdown">
+              {boards.length === 0 ? (
+                <span>No saved boards yet</span>
+              ) : (
+                boards.map((item) => (
+                  <button key={item.boardId} onClick={() => switchBoard(item.boardId)}>
+                    {item.title}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+        <button
+          className={`nav-link ${activeView === 'analytics' ? 'active' : ''}`}
+          onClick={() => dispatch(uiActions.setActiveView(activeView === 'analytics' ? 'board' : 'analytics'))}
+        >
+          <BarChart3 size={16} />
+          Analytics
+        </button>
+      </div>
+
+      <QuickAddInput compact />
+
+      <div className="topbar-right">
+        <PresenceAvatars />
+        <UndoRedoButtons compact />
+        <PanelToggleButtons />
+        <UserMenu />
+      </div>
+    </header>
+  )
+}
+
+```
+
+===== FILE: src\components\TopBar\UserMenu.jsx =====
+```
+import { LogOut, Moon, User } from 'lucide-react'
+import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { userActions } from '../../store/userSlice.js'
+import { Avatar } from '../common/Avatar.jsx'
+
+export function UserMenu() {
+  const dispatch = useDispatch()
+  const [open, setOpen] = useState(false)
+  const user = useSelector((state) => state.user.currentUser)
+
+  return (
+    <div className="user-menu">
+      <button className="user-menu-trigger" onClick={() => setOpen((value) => !value)} title="User menu">
+        <Avatar name={user.name} color={user.avatarColor} size={30} />
+      </button>
+      {open && (
+        <div className="user-dropdown">
+          <button>
+            <User size={15} /> Profile
+          </button>
+          <button>
+            <Moon size={15} /> Theme
+          </button>
+          <button className="danger-text" onClick={() => dispatch(userActions.logout())}>
+            <LogOut size={15} /> Logout
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+```
+
+===== FILE: src\data\seed.js =====
+```
+export const currentUser = {
+  _id: 'u-you',
+  name: 'Kafee',
+  email: 'kafee@example.com',
+  avatarColor: '#2563eb',
+}
+
+export const boardSeed = {
+  currentBoardId: 'board-flow',
+  boardsById: {
+    'board-flow': {
+      _id: 'board-flow',
+      title: 'FlowBoard Launch Sprint',
+      ownerId: 'u-you',
+      members: ['u-you', 'u-ana', 'u-rahul'],
+      columns: ['col-backlog', 'col-progress', 'col-review', 'col-done'],
+      createdAt: Date.now() - 86400000,
+      updatedAt: Date.now(),
+    },
+  },
+  columnsById: {
+    'col-backlog': {
+      _id: 'col-backlog',
+      boardId: 'board-flow',
+      title: 'Backlog',
+      order: 0,
+      taskIds: ['task-ai', 'task-socket', 'task-offline'],
+    },
+    'col-progress': {
+      _id: 'col-progress',
+      boardId: 'board-flow',
+      title: 'In Progress',
+      order: 1,
+      taskIds: ['task-history', 'task-ui'],
+    },
+    'col-review': {
+      _id: 'col-review',
+      boardId: 'board-flow',
+      title: 'Review',
+      order: 2,
+      taskIds: ['task-demo'],
+    },
+    'col-done': {
+      _id: 'col-done',
+      boardId: 'board-flow',
+      title: 'Done',
+      order: 3,
+      taskIds: ['task-store'],
+    },
+  },
+  columnOrder: ['col-backlog', 'col-progress', 'col-review', 'col-done'],
+}
+
+export const taskSeed = [
+  {
+    _id: 'task-ai',
+    boardId: 'board-flow',
+    columnId: 'col-backlog',
+    title: 'AI natural language quick add',
+    description: 'Parse a plain English request into title, priority, and due date before confirmation.',
+    subtasks: [
+      { id: 'st-ai-1', text: 'Create parse endpoint contract', done: true },
+      { id: 'st-ai-2', text: 'Show AI draft before saving', done: false },
+    ],
+    labels: [{ text: 'AI', color: '#7c3aed' }],
+    priority: 'high',
+    dueDate: '2026-07-30',
+    assigneeIds: ['u-you'],
+    createdBy: 'u-you',
+    createdAt: Date.now() - 6500000,
+    updatedAt: Date.now() - 240000,
+  },
+  {
+    _id: 'task-socket',
+    boardId: 'board-flow',
+    columnId: 'col-backlog',
+    title: 'Socket.io action relay',
+    description: 'Broadcast Redux actions to every connected board client.',
+    subtasks: [],
+    labels: [{ text: 'Realtime', color: '#2563eb' }],
+    priority: 'medium',
+    dueDate: null,
+    assigneeIds: ['u-rahul'],
+    createdBy: 'u-you',
+    createdAt: Date.now() - 5900000,
+    updatedAt: Date.now() - 5900000,
+  },
+  {
+    _id: 'task-offline',
+    boardId: 'board-flow',
+    columnId: 'col-backlog',
+    title: 'Offline action queue',
+    description: 'Queue broadcastable actions while offline and flush them after reconnect.',
+    subtasks: [],
+    labels: [{ text: 'Tier 3', color: '#64748b' }],
+    priority: 'low',
+    dueDate: null,
+    assigneeIds: [],
+    createdBy: 'u-you',
+    createdAt: Date.now() - 4800000,
+    updatedAt: Date.now() - 4800000,
+  },
+  {
+    _id: 'task-history',
+    boardId: 'board-flow',
+    columnId: 'col-progress',
+    title: 'Branching undo/redo timeline',
+    description: 'Capture inverse Redux actions in middleware and make them inspectable.',
+    subtasks: [
+      { id: 'st-h-1', text: 'Compute inverse move action', done: true },
+      { id: 'st-h-2', text: 'Render jumpable timeline', done: false },
+    ],
+    labels: [{ text: 'Redux', color: '#dc2626' }],
+    priority: 'high',
+    dueDate: '2026-07-28',
+    assigneeIds: ['u-you'],
+    createdBy: 'u-you',
+    createdAt: Date.now() - 7200000,
+    updatedAt: Date.now() - 120000,
+  },
+  {
+    _id: 'task-ui',
+    boardId: 'board-flow',
+    columnId: 'col-progress',
+    title: 'Production-grade board UI',
+    description: 'Dense, polished interface for repeated project management workflows.',
+    subtasks: [],
+    labels: [{ text: 'Design', color: '#f59e0b' }],
+    priority: 'medium',
+    dueDate: '2026-07-26',
+    assigneeIds: ['u-you'],
+    createdBy: 'u-you',
+    createdAt: Date.now() - 7100000,
+    updatedAt: Date.now() - 190000,
+  },
+  {
+    _id: 'task-demo',
+    boardId: 'board-flow',
+    columnId: 'col-review',
+    title: 'Hackathon pitch script',
+    description: 'Show two-window sync, undo from timeline, AI quick add, and middleware architecture.',
+    subtasks: [],
+    labels: [{ text: 'Demo', color: '#16a34a' }],
+    priority: 'high',
+    dueDate: '2026-07-24',
+    assigneeIds: ['u-ana'],
+    createdBy: 'u-you',
+    createdAt: Date.now() - 3000000,
+    updatedAt: Date.now() - 500000,
+  },
+  {
+    _id: 'task-store',
+    boardId: 'board-flow',
+    columnId: 'col-done',
+    title: 'Normalized Redux store',
+    description: 'Board, columns, tasks, history, activity, presence, AI, and UI slices wired.',
+    subtasks: [],
+    labels: [{ text: 'Redux', color: '#dc2626' }],
+    priority: 'medium',
+    dueDate: null,
+    assigneeIds: ['u-you'],
+    createdBy: 'u-you',
+    createdAt: Date.now() - 8600000,
+    updatedAt: Date.now() - 7600000,
+  },
+]
+
+export const collaborators = [
+  { userId: 'u-you', name: 'Kafee', avatarColor: '#2563eb', cursor: null },
+  { userId: 'u-ana', name: 'Ana', avatarColor: '#f97316', cursor: { x: 62, y: 28 } },
+  { userId: 'u-rahul', name: 'Rahul', avatarColor: '#059669', cursor: { x: 81, y: 66 } },
+]
+
+```
+
+===== FILE: src\main.jsx =====
+```
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { Provider } from 'react-redux'
+import App from './App.jsx'
+import { store } from './store/index.js'
+import './styles.css'
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <Provider store={store}>
+      <App />
+    </Provider>
+  </React.StrictMode>,
+)
+
+```
+
+===== FILE: src\store\actionCreators.js =====
+```
+export const markUndoable = (action) => ({
+  ...action,
+  meta: { ...action.meta, undoable: true, broadcast: true },
+})
+
+export const markBroadcast = (action) => ({
+  ...action,
+  meta: { ...action.meta, broadcast: true },
+})
+
+```
+
+===== FILE: src\store\activitySlice.js =====
+```
+import { createSlice } from '@reduxjs/toolkit'
+
+const activitySlice = createSlice({
+  name: 'activity',
+  initialState: {
+    entries: [
+      {
+        id: 'activity-seed-1',
+        boardId: 'board-flow',
+        userId: 'u-ana',
+        userName: 'Ana',
+        action: 'reviewed_task',
+        targetTitle: 'Hackathon pitch script',
+        timestamp: Date.now() - 900000,
+      },
+      {
+        id: 'activity-seed-2',
+        boardId: 'board-flow',
+        userId: 'u-you',
+        userName: 'Kafee',
+        action: 'created_task',
+        targetTitle: 'Branching undo/redo timeline',
+        timestamp: Date.now() - 1500000,
+      },
+    ],
+    unreadCount: 2,
+  },
+  reducers: {
+    logActivity: (state, action) => {
+      state.entries.unshift(action.payload)
+      state.unreadCount += 1
+    },
+    markAllRead: (state) => {
+      state.unreadCount = 0
+    },
+  },
+})
+
+export const activityActions = activitySlice.actions
+export default activitySlice.reducer
+
+```
+
+===== FILE: src\store\aiSlice.js =====
+```
+import { createSlice } from '@reduxjs/toolkit'
+
+const aiSlice = createSlice({
+  name: 'ai',
+  initialState: {
+    status: 'idle',
+    lastSuggestion: null,
+    error: null,
+  },
+  reducers: {
+    requestStarted: (state) => {
+      state.status = 'loading'
+      state.error = null
+    },
+    requestSucceeded: (state, action) => {
+      state.status = 'succeeded'
+      state.lastSuggestion = action.payload
+    },
+    requestFailed: (state, action) => {
+      state.status = 'failed'
+      state.error = action.payload
+    },
+    clearSuggestion: (state) => {
+      state.status = 'idle'
+      state.lastSuggestion = null
+      state.error = null
+    },
+  },
+})
+
+export const aiActions = aiSlice.actions
+export default aiSlice.reducer
+
+```
+
+===== FILE: src\store\boardSlice.js =====
+```
+import { createSlice } from '@reduxjs/toolkit'
+import { boardSeed } from '../data/seed.js'
+
+const boardSlice = createSlice({
+  name: 'board',
+  initialState: boardSeed,
+  reducers: {
+    setBoard: (state, action) => action.payload,
+    hydrateBoardState: (state, action) => {
+      const incoming = action.payload
+      state.currentBoardId = incoming.currentBoardId
+      state.boardsById = incoming.boardsById
+      state.columnsById = incoming.columnsById
+      state.columnOrder = incoming.columnOrder
+    },
+    createBoard: (state, action) => {
+      const { board, columns } = action.payload
+      state.boardsById[board._id] = board
+      columns.forEach((column) => {
+        state.columnsById[column._id] = column
+      })
+      state.currentBoardId = board._id
+      state.columnOrder = columns.map((column) => column._id)
+    },
+    addColumn: (state, action) => {
+      const column = action.payload
+      state.columnsById[column._id] = column
+      state.columnOrder.push(column._id)
+      state.boardsById[state.currentBoardId].columns = state.columnOrder
+    },
+    removeColumn: (state, action) => {
+      const { columnId } = action.payload
+      delete state.columnsById[columnId]
+      state.columnOrder = state.columnOrder.filter((id) => id !== columnId)
+      state.boardsById[state.currentBoardId].columns = state.columnOrder
+    },
+    renameColumn: (state, action) => {
+      const { columnId, title } = action.payload
+      state.columnsById[columnId].title = title
+    },
+    reorderColumns: (state, action) => {
+      state.columnOrder = action.payload.columnOrder
+      state.columnOrder.forEach((id, order) => {
+        state.columnsById[id].order = order
+      })
+      state.boardsById[state.currentBoardId].columns = state.columnOrder
+    },
+    columnTaskIdsChanged: (state, action) => {
+      const { columnId, taskIds } = action.payload
+      state.columnsById[columnId].taskIds = taskIds
+    },
+    taskAddedToColumn: (state, action) => {
+      const { columnId, taskId, index } = action.payload
+      const taskIds = state.columnsById[columnId].taskIds
+      const insertAt = Number.isInteger(index) ? index : taskIds.length
+      taskIds.splice(insertAt, 0, taskId)
+    },
+    taskRemovedFromColumn: (state, action) => {
+      const { columnId, taskId } = action.payload
+      state.columnsById[columnId].taskIds = state.columnsById[columnId].taskIds.filter((id) => id !== taskId)
+    },
+    taskMovedAcrossColumns: (state, action) => {
+      const { taskId, fromColumnId, toColumnId, toIndex } = action.payload
+      if (!state.columnsById[fromColumnId] || !state.columnsById[toColumnId]) return
+      state.columnsById[fromColumnId].taskIds = state.columnsById[fromColumnId].taskIds.filter((id) => id !== taskId)
+      const targetIds = state.columnsById[toColumnId].taskIds.filter((id) => id !== taskId)
+      const insertAt = Math.max(0, Math.min(toIndex ?? targetIds.length, targetIds.length))
+      targetIds.splice(insertAt, 0, taskId)
+      state.columnsById[toColumnId].taskIds = targetIds
+    },
+  },
+})
+
+export const boardActions = boardSlice.actions
+export default boardSlice.reducer
+
+export const selectBoard = (state) => state.board.boardsById[state.board.currentBoardId]
+export const selectColumnsInOrder = (state) =>
+  state.board.columnOrder.map((id) => state.board.columnsById[id]).filter(Boolean)
+export const selectColumnById = (state, columnId) => state.board.columnsById[columnId]
+
+```
+
+===== FILE: src\store\historySlice.js =====
+```
+import { createSlice } from '@reduxjs/toolkit'
+
+const historySlice = createSlice({
+  name: 'history',
+  initialState: {
+    past: [],
+    future: [],
+    branches: {},
+    isTimeTraveling: false,
+  },
+  reducers: {
+    pushHistoryEntry: (state, action) => {
+      if (state.future.length > 0) {
+        const branchPointId = state.past.at(-1)?.id ?? 'root'
+        state.branches[branchPointId] = [...(state.branches[branchPointId] ?? []), ...state.future]
+      }
+      state.past.push(action.payload)
+      state.future = []
+    },
+    undoPrepared: (state) => {
+      state.isTimeTraveling = true
+    },
+    undoCompleted: (state) => {
+      const entry = state.past.pop()
+      if (entry) state.future.unshift(entry)
+      state.isTimeTraveling = false
+    },
+    redoPrepared: (state) => {
+      state.isTimeTraveling = true
+    },
+    redoCompleted: (state) => {
+      const entry = state.future.shift()
+      if (entry) state.past.push(entry)
+      state.isTimeTraveling = false
+    },
+    clearHistory: (state) => {
+      state.past = []
+      state.future = []
+      state.branches = {}
+      state.isTimeTraveling = false
+    },
+  },
+})
+
+export const historyActions = historySlice.actions
+export default historySlice.reducer
+
+```
+
+===== FILE: src\store\id.js =====
+```
+export const createId = (prefix) =>
+  `${prefix}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`
+
+```
+
+===== FILE: src\store\index.js =====
+```
+import { configureStore } from '@reduxjs/toolkit'
+import boardReducer from './boardSlice.js'
+import taskReducer from './taskSlice.js'
+import historyReducer from './historySlice.js'
+import userReducer from './userSlice.js'
+import presenceReducer from './presenceSlice.js'
+import activityReducer from './activitySlice.js'
+import aiReducer from './aiSlice.js'
+import uiReducer from './uiSlice.js'
+import { activityMiddleware } from './middleware/activityMiddleware.js'
+import { boardSyncMiddleware } from './middleware/boardSyncMiddleware.js'
+import { historyMiddleware } from './middleware/historyMiddleware.js'
+import { persistMiddleware } from './middleware/persistMiddleware.js'
+import { createSocketMiddleware } from './middleware/socketMiddleware.js'
+
+export const store = configureStore({
+  reducer: {
+    board: boardReducer,
+    tasks: taskReducer,
+    history: historyReducer,
+    user: userReducer,
+    presence: presenceReducer,
+    activity: activityReducer,
+    ai: aiReducer,
+    ui: uiReducer,
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: false,
+    }).concat(historyMiddleware, boardSyncMiddleware, activityMiddleware, persistMiddleware, createSocketMiddleware()),
+})
+
+```
+
+===== FILE: src\store\middleware\activityMiddleware.js =====
+```
+import { activityActions } from '../activitySlice.js'
+import { boardActions } from '../boardSlice.js'
+import { taskActions } from '../taskSlice.js'
+import { createId } from '../id.js'
+
+const actionLabels = {
+  [taskActions.addTask.type]: 'created_task',
+  [taskActions.deleteTask.type]: 'deleted_task',
+  [taskActions.updateTask.type]: 'updated_task',
+  [taskActions.moveTask.type]: 'moved_task',
+  [boardActions.addColumn.type]: 'created_column',
+  [boardActions.renameColumn.type]: 'renamed_column',
+}
+
+export const activityMiddleware = (store) => (next) => (action) => {
+  const stateBefore = store.getState()
+  const result = next(action)
+
+  if (action.meta?.loggable !== false && actionLabels[action.type] && !action.meta?.fromHistory) {
+    const user = action.meta?.remoteUser ?? stateBefore.user.currentUser
+    const payload = action.payload
+    const task =
+      payload?.taskId ? stateBefore.tasks.entities[payload.taskId] : payload?._id ? payload : stateBefore.tasks.entities[payload]
+    const targetTitle = task?.title ?? payload?.title ?? 'board item'
+
+    store.dispatch(
+      activityActions.logActivity({
+        id: createId('activity'),
+        boardId: stateBefore.board.currentBoardId,
+        userId: user?._id ?? user?.userId ?? 'remote',
+        userName: user?.name ?? 'Teammate',
+        action: actionLabels[action.type],
+        targetTitle,
+        timestamp: Date.now(),
+      }),
+    )
+  }
+
+  return result
+}
+
+```
+
+===== FILE: src\store\middleware\boardSyncMiddleware.js =====
+```
+import { boardActions } from '../boardSlice.js'
+import { taskActions } from '../taskSlice.js'
+
+export const boardSyncMiddleware = (store) => (next) => (action) => {
+  const before = store.getState()
+  const result = next(action)
+
+  if (action.type === taskActions.addTask.type || action.type === taskActions.restoreTask.type) {
+    const task = action.payload
+    if (task?.columnId) {
+      store.dispatch(boardActions.taskAddedToColumn({ columnId: task.columnId, taskId: task._id }))
+    }
+  }
+
+  if (action.type === taskActions.deleteTask.type) {
+    const task = before.tasks.entities[action.payload]
+    if (task?.columnId) {
+      store.dispatch(boardActions.taskRemovedFromColumn({ columnId: task.columnId, taskId: action.payload }))
+    }
+  }
+
+  if (action.type === taskActions.moveTask.type) {
+    const { taskId, toColumnId, toIndex } = action.payload
+    const fromColumnId = before.tasks.entities[taskId]?.columnId
+    if (fromColumnId && toColumnId) {
+      store.dispatch(boardActions.taskMovedAcrossColumns({ taskId, fromColumnId, toColumnId, toIndex }))
+    }
+  }
+
+  return result
+}
+
+```
+
+===== FILE: src\store\middleware\historyMiddleware.js =====
+```
+import { boardActions } from '../boardSlice.js'
+import { historyActions } from '../historySlice.js'
+import { taskActions } from '../taskSlice.js'
+import { createId } from '../id.js'
+
+const actionType = (actionCreator) => actionCreator.type
+
+const describeAction = (action, stateBefore) => {
+  const payload = action.payload
+  const task = payload?.taskId ? stateBefore.tasks.entities[payload.taskId] : payload?._id ? stateBefore.tasks.entities[payload._id] : null
+  const column = payload?.toColumnId ? stateBefore.board.columnsById[payload.toColumnId] : null
+
+  switch (action.type) {
+    case actionType(taskActions.addTask):
+      return `created "${payload.title}"`
+    case actionType(taskActions.deleteTask):
+      return `deleted "${task?.title ?? payload}"`
+    case actionType(taskActions.updateTask):
+      return `updated "${task?.title ?? 'task'}"`
+    case actionType(taskActions.moveTask):
+      return `moved "${task?.title ?? 'task'}" to ${column?.title ?? 'another column'}`
+    case actionType(taskActions.toggleSubtask):
+      return `toggled a subtask on "${task?.title ?? 'task'}"`
+    case actionType(taskActions.addSubtask):
+      return `added a subtask to "${task?.title ?? 'task'}"`
+    case actionType(taskActions.addLabel):
+      return `labeled "${task?.title ?? 'task'}"`
+    case actionType(taskActions.assignUser):
+      return `assigned "${task?.title ?? 'task'}"`
+    case actionType(boardActions.addColumn):
+      return `added column "${payload.title}"`
+    case actionType(boardActions.removeColumn):
+      return `removed column "${stateBefore.board.columnsById[payload.columnId]?.title ?? 'column'}"`
+    case actionType(boardActions.renameColumn):
+      return `renamed a column to "${payload.title}"`
+    default:
+      return action.type
+  }
+}
+
+const computeInverseAction = (action, stateBefore) => {
+  const payload = action.payload
+
+  switch (action.type) {
+    case actionType(taskActions.addTask):
+      return taskActions.deleteTask(payload._id)
+    case actionType(taskActions.deleteTask):
+      return taskActions.restoreTask(stateBefore.tasks.entities[payload])
+    case actionType(taskActions.updateTask): {
+      const previous = stateBefore.tasks.entities[payload.taskId]
+      const revertedChanges = Object.keys(payload.changes).reduce((acc, key) => {
+        acc[key] = previous?.[key]
+        return acc
+      }, {})
+      return taskActions.updateTask({ taskId: payload.taskId, changes: revertedChanges })
+    }
+    case actionType(taskActions.moveTask): {
+      const task = stateBefore.tasks.entities[payload.taskId]
+      const fromColumnId = task?.columnId
+      const fromColumn = stateBefore.board.columnsById[fromColumnId]
+      return taskActions.moveTask({
+        taskId: payload.taskId,
+        fromColumnId: payload.toColumnId,
+        toColumnId: fromColumnId,
+        toIndex: fromColumn?.taskIds.indexOf(payload.taskId) ?? 0,
+      })
+    }
+    case actionType(taskActions.toggleSubtask):
+      return taskActions.toggleSubtask(payload)
+    case actionType(taskActions.setSubtasks): {
+      const task = stateBefore.tasks.entities[payload.taskId]
+      return taskActions.setSubtasks({ taskId: payload.taskId, subtasks: task?.subtasks ?? [] })
+    }
+    case actionType(taskActions.addSubtask): {
+      const task = stateBefore.tasks.entities[payload.taskId]
+      return taskActions.setSubtasks({ taskId: payload.taskId, subtasks: task?.subtasks ?? [] })
+    }
+    case actionType(taskActions.addLabel): {
+      const task = stateBefore.tasks.entities[payload.taskId]
+      return taskActions.updateTask({ taskId: payload.taskId, changes: { labels: task?.labels ?? [] } })
+    }
+    case actionType(taskActions.assignUser): {
+      const task = stateBefore.tasks.entities[payload.taskId]
+      return taskActions.updateTask({ taskId: payload.taskId, changes: { assigneeIds: task?.assigneeIds ?? [] } })
+    }
+    case actionType(boardActions.addColumn):
+      return boardActions.removeColumn({ columnId: payload._id })
+    case actionType(boardActions.removeColumn): {
+      const column = stateBefore.board.columnsById[payload.columnId]
+      return column ? boardActions.addColumn(column) : null
+    }
+    case actionType(boardActions.renameColumn):
+      return boardActions.renameColumn({
+        columnId: payload.columnId,
+        title: stateBefore.board.columnsById[payload.columnId]?.title,
+      })
+    default:
+      return null
+  }
+}
+
+export const historyMiddleware = (store) => (next) => (action) => {
+  if (action.type === 'history/undo') {
+    const entry = store.getState().history.past.at(-1)
+    if (!entry) return undefined
+    store.dispatch(historyActions.undoPrepared())
+    store.dispatch({ ...entry.inverseAction, meta: { ...entry.inverseAction.meta, fromHistory: true, broadcast: true } })
+    store.dispatch(historyActions.undoCompleted())
+    return entry
+  }
+
+  if (action.type === 'history/redo') {
+    const entry = store.getState().history.future[0]
+    if (!entry) return undefined
+    store.dispatch(historyActions.redoPrepared())
+    store.dispatch({ ...entry.action, meta: { ...entry.action.meta, fromHistory: true, broadcast: true } })
+    store.dispatch(historyActions.redoCompleted())
+    return entry
+  }
+
+  if (action.type === 'history/jumpTo') {
+    const { past, future } = store.getState().history
+    const pastIndex = past.findIndex((entry) => entry.id === action.payload)
+
+    if (pastIndex !== -1) {
+      const stepsToUndo = past.length - 1 - pastIndex
+      for (let i = 0; i < stepsToUndo; i += 1) {
+        store.dispatch({ type: 'history/undo' })
+      }
+      return pastIndex
+    }
+
+    const futureIndex = future.findIndex((entry) => entry.id === action.payload)
+    if (futureIndex !== -1) {
+      const stepsToRedo = futureIndex + 1
+      for (let i = 0; i < stepsToRedo; i += 1) {
+        store.dispatch({ type: 'history/redo' })
+      }
+      return futureIndex
+    }
+
+    return undefined
+  }
+
+  const isUndoable = action.meta?.undoable === true
+  const stateBefore = store.getState()
+  const result = next(action)
+  const isTimeTraveling = store.getState().history.isTimeTraveling
+
+  if (isUndoable && !isTimeTraveling && !action.meta?.fromHistory) {
+    const inverseAction = computeInverseAction(action, stateBefore)
+    if (inverseAction) {
+      store.dispatch(
+        historyActions.pushHistoryEntry({
+          id: createId('history'),
+          action,
+          inverseAction,
+          userId: stateBefore.user.currentUser?._id,
+          userName: stateBefore.user.currentUser?.name,
+          timestamp: Date.now(),
+          boardId: stateBefore.board.currentBoardId,
+          description: describeAction(action, stateBefore),
+        }),
+      )
+    }
+  }
+
+  return result
+}
+
+```
+
+===== FILE: src\store\middleware\persistMiddleware.js =====
+```
+const LOCAL_KEY = 'flowboard:offline-state'
+const QUEUE_KEY = 'flowboard:offline-queue'
+const LAST_WRITE_KEY = 'flowboard:last-write-at'
+
+const persistablePrefixes = ['tasks/', 'board/']
+let saveTimer
+
+const getAuthHeaders = (state) => {
+  const token = state.user.token || localStorage.getItem('flowboard:token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+const buildSnapshot = (state) => ({
+  board: state.board,
+  tasks: state.tasks,
+  user: state.user,
+  savedAt: Date.now(),
+})
+
+const saveSnapshot = async (state) => {
+  const snapshot = buildSnapshot(state)
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(snapshot))
+  localStorage.setItem(LAST_WRITE_KEY, String(snapshot.savedAt))
+
+  if (!navigator.onLine) {
+    const queue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]')
+    queue.push({ id: Date.now(), snapshot })
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-10)))
+    return
+  }
+
+  await fetch(`/api/boards/${state.board.currentBoardId}/state`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(state) },
+    body: JSON.stringify(snapshot),
+  })
+}
+
+export const flushOfflineQueue = async (state) => {
+  const queue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]')
+  if (!navigator.onLine || queue.length === 0) return
+
+  for (const item of queue) {
+    await fetch(`/api/boards/${item.snapshot.board.currentBoardId}/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(state) },
+      body: JSON.stringify(item.snapshot),
+    })
+  }
+  localStorage.removeItem(QUEUE_KEY)
+}
+
+export const loadLocalSnapshot = () => JSON.parse(localStorage.getItem(LOCAL_KEY) || 'null')
+export const queuedOfflineCount = () => JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]').length
+export const lastLocalWriteAt = () => Number(localStorage.getItem(LAST_WRITE_KEY) || 0)
+export const rememberRemoteSnapshot = (snapshot) => {
+  if (snapshot?.savedAt) localStorage.setItem(LOCAL_KEY, JSON.stringify(snapshot))
+}
+
+export const persistMiddleware = (store) => (next) => (action) => {
+  const result = next(action)
+  const isPersistable = persistablePrefixes.some((prefix) => action.type.startsWith(prefix))
+  if (isPersistable && !action.meta?.skipPersist) {
+    window.clearTimeout(saveTimer)
+    saveTimer = window.setTimeout(() => {
+      saveSnapshot(store.getState()).catch(() => {
+        const snapshot = buildSnapshot(store.getState())
+        const queue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]')
+        queue.push({ id: Date.now(), snapshot })
+        localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-10)))
+      })
+    }, 450)
+  }
+  return result
+}
+
+```
+
+===== FILE: src\store\middleware\socketMiddleware.js =====
+```
+import { io } from 'socket.io-client'
+import { presenceActions } from '../presenceSlice.js'
+
+let socket
+
+export const createSocketMiddleware = () => (store) => {
+  const realtimeEnabled =
+    import.meta.env.DEV ||
+    import.meta.env.VITE_ENABLE_REALTIME === 'true' ||
+    Boolean(import.meta.env.VITE_REALTIME_URL)
+
+  if (typeof window !== 'undefined' && realtimeEnabled) {
+    socket = io(import.meta.env.VITE_REALTIME_URL || '/', { autoConnect: true })
+
+    socket.on('connect', () => {
+      const state = store.getState()
+      if (!state.user.currentUser?._id) return
+      socket.emit('board:join', {
+        boardId: state.board.currentBoardId,
+        user: state.user.currentUser,
+      })
+    })
+
+    socket.on('board:action', ({ action, user }) => {
+      store.dispatch({
+        ...action,
+        meta: { ...action.meta, fromRemote: true, undoable: false, remoteUser: user },
+      })
+    })
+
+    socket.on('presence:update', (users) => {
+      store.dispatch(presenceActions.presenceUpdated(users))
+    })
+
+    socket.on('presence:cursor', ({ userId, cursor }) => {
+      store.dispatch({ ...presenceActions.cursorMoved({ userId, cursor }), meta: { fromRemote: true } })
+    })
+
+    socket.on('presence:editing', ({ taskId, userId, isEditing }) => {
+      const action = isEditing
+        ? presenceActions.startedEditingTask({ taskId, userId })
+        : presenceActions.stoppedEditingTask({ taskId })
+      store.dispatch({ ...action, meta: { fromRemote: true } })
+    })
+  }
+
+  return (next) => (action) => {
+    const shouldBroadcast = action.meta?.broadcast && !action.meta?.fromRemote
+    if (shouldBroadcast && socket?.connected) {
+      const state = store.getState()
+      if (!state.user.currentUser?._id) return next(action)
+      socket.emit('board:action', {
+        boardId: state.board.currentBoardId,
+        action,
+        user: state.user.currentUser,
+      })
+    }
+
+    if (action.type === 'presence/cursorMoved' && !action.meta?.fromRemote && socket?.connected) {
+      if (!store.getState().user.currentUser?._id) return next(action)
+      socket.emit('presence:cursor', {
+        boardId: store.getState().board.currentBoardId,
+        cursor: action.payload.cursor,
+      })
+    }
+
+    if (action.type === presenceActions.startedEditingTask.type && !action.meta?.fromRemote && socket?.connected) {
+      if (!store.getState().user.currentUser?._id) return next(action)
+      socket.emit('presence:editing:start', {
+        boardId: store.getState().board.currentBoardId,
+        taskId: action.payload.taskId,
+      })
+    }
+
+    if (action.type === presenceActions.stoppedEditingTask.type && !action.meta?.fromRemote && socket?.connected) {
+      if (!store.getState().user.currentUser?._id) return next(action)
+      socket.emit('presence:editing:stop', {
+        boardId: store.getState().board.currentBoardId,
+        taskId: action.payload.taskId,
+      })
+    }
+
+    return next(action)
+  }
+}
+
+```
+
+===== FILE: src\store\presenceSlice.js =====
+```
+import { createSlice } from '@reduxjs/toolkit'
+import { collaborators } from '../data/seed.js'
+
+const presenceSlice = createSlice({
+  name: 'presence',
+  initialState: {
+    onlineUsers: collaborators,
+    editingMap: { 'task-history': 'u-ana' },
+  },
+  reducers: {
+    presenceUpdated: (state, action) => {
+      state.onlineUsers = action.payload
+    },
+    userJoined: (state, action) => {
+      if (!state.onlineUsers.some((user) => user.userId === action.payload.userId)) {
+        state.onlineUsers.push(action.payload)
+      }
+    },
+    userLeft: (state, action) => {
+      state.onlineUsers = state.onlineUsers.filter((user) => user.userId !== action.payload)
+    },
+    cursorMoved: (state, action) => {
+      const { userId, cursor } = action.payload
+      const user = state.onlineUsers.find((item) => item.userId === userId)
+      if (user) user.cursor = cursor
+    },
+    startedEditingTask: (state, action) => {
+      state.editingMap[action.payload.taskId] = action.payload.userId
+    },
+    stoppedEditingTask: (state, action) => {
+      delete state.editingMap[action.payload.taskId]
+    },
+  },
+})
+
+export const presenceActions = presenceSlice.actions
+export default presenceSlice.reducer
+
+```
+
+===== FILE: src\store\taskSlice.js =====
+```
+import { createEntityAdapter, createSlice } from '@reduxjs/toolkit'
+import { taskSeed } from '../data/seed.js'
+
+const tasksAdapter = createEntityAdapter({
+  selectId: (task) => task._id,
+  sortComparer: (a, b) => a.createdAt - b.createdAt,
+})
+
+const taskSlice = createSlice({
+  name: 'tasks',
+  initialState: tasksAdapter.setAll(tasksAdapter.getInitialState(), taskSeed),
+  reducers: {
+    hydrateTasksState: (state, action) => {
+      tasksAdapter.setAll(state, Object.values(action.payload.entities ?? {}))
+    },
+    addTask: tasksAdapter.addOne,
+    updateTask: (state, action) => {
+      const { taskId, changes } = action.payload
+      tasksAdapter.updateOne(state, { id: taskId, changes: { ...changes, updatedAt: Date.now() } })
+    },
+    deleteTask: tasksAdapter.removeOne,
+    restoreTask: tasksAdapter.addOne,
+    moveTask: (state, action) => {
+      const { taskId, toColumnId } = action.payload
+      const task = state.entities[taskId]
+      if (task) {
+        task.columnId = toColumnId
+        task.updatedAt = Date.now()
+      }
+    },
+    toggleSubtask: (state, action) => {
+      const { taskId, subtaskId } = action.payload
+      const subtask = state.entities[taskId]?.subtasks.find((item) => item.id === subtaskId)
+      if (subtask) subtask.done = !subtask.done
+    },
+    setSubtasks: (state, action) => {
+      const { taskId, subtasks } = action.payload
+      const task = state.entities[taskId]
+      if (task) {
+        task.subtasks = subtasks
+        task.updatedAt = Date.now()
+      }
+    },
+    addSubtask: (state, action) => {
+      const { taskId, subtask } = action.payload
+      const task = state.entities[taskId]
+      if (task) {
+        task.subtasks.push(subtask)
+        task.updatedAt = Date.now()
+      }
+    },
+    addLabel: (state, action) => {
+      const { taskId, label } = action.payload
+      const task = state.entities[taskId]
+      if (task && !task.labels.some((item) => item.text.toLowerCase() === label.text.toLowerCase())) {
+        task.labels.push(label)
+        task.updatedAt = Date.now()
+      }
+    },
+    assignUser: (state, action) => {
+      const { taskId, userId } = action.payload
+      const task = state.entities[taskId]
+      if (task && userId && !task.assigneeIds.includes(userId)) {
+        task.assigneeIds.push(userId)
+        task.updatedAt = Date.now()
+      }
+    },
+  },
+})
+
+export const taskActions = taskSlice.actions
+export default taskSlice.reducer
+
+export const taskSelectors = tasksAdapter.getSelectors((state) => state.tasks)
+export const selectTaskById = (state, taskId) => taskSelectors.selectById(state, taskId)
+export const selectTasksByColumn = (state, columnId) => {
+  const column = state.board.columnsById[columnId]
+  return (column?.taskIds ?? []).map((id) => state.tasks.entities[id]).filter(Boolean)
+}
+
+```
+
+===== FILE: src\store\uiSlice.js =====
+```
+import { createSlice } from '@reduxjs/toolkit'
+
+const uiSlice = createSlice({
+  name: 'ui',
+  initialState: {
+    selectedTaskId: null,
+    isSidePanelOpen: false,
+    sidePanelTab: 'history',
+    isCommandPaletteOpen: false,
+    activeView: 'board',
+    activeSidebarItem: 'Projects',
+    selectedDate: '2026-07-24',
+    theme: 'light',
+  },
+  reducers: {
+    selectTask: (state, action) => {
+      state.selectedTaskId = action.payload
+    },
+    closeTask: (state) => {
+      state.selectedTaskId = null
+    },
+    openSidePanel: (state, action) => {
+      state.isSidePanelOpen = true
+      state.sidePanelTab = action.payload ?? state.sidePanelTab
+    },
+    closeSidePanel: (state) => {
+      state.isSidePanelOpen = false
+    },
+    setSidePanelTab: (state, action) => {
+      state.sidePanelTab = action.payload
+      state.isSidePanelOpen = true
+    },
+    setActiveView: (state, action) => {
+      state.activeView = action.payload
+    },
+    setActiveSidebarItem: (state, action) => {
+      state.activeSidebarItem = action.payload
+    },
+    shiftSelectedDate: (state, action) => {
+      const date = new Date(`${state.selectedDate}T00:00:00`)
+      date.setDate(date.getDate() + action.payload)
+      state.selectedDate = date.toISOString().slice(0, 10)
+    },
+    toggleCommandPalette: (state) => {
+      state.isCommandPaletteOpen = !state.isCommandPaletteOpen
+    },
+  },
+})
+
+export const uiActions = uiSlice.actions
+export default uiSlice.reducer
+
+```
+
+===== FILE: src\store\userSlice.js =====
+```
+import { createSlice } from '@reduxjs/toolkit'
+import { currentUser } from '../data/seed.js'
+
+const userSlice = createSlice({
+  name: 'user',
+  initialState: {
+    currentUser: JSON.parse(localStorage.getItem('flowboard:user') || 'null') ?? currentUser,
+    token: localStorage.getItem('flowboard:token'),
+    isAuthenticated: Boolean(localStorage.getItem('flowboard:token')),
+    authStatus: 'idle',
+    authError: null,
+  },
+  reducers: {
+    authStarted: (state) => {
+      state.authStatus = 'loading'
+      state.authError = null
+    },
+    authSucceeded: (state, action) => {
+      state.currentUser = action.payload.user
+      state.token = action.payload.token
+      state.isAuthenticated = true
+      state.authStatus = 'succeeded'
+      state.authError = null
+      localStorage.setItem('flowboard:user', JSON.stringify(action.payload.user))
+      localStorage.setItem('flowboard:token', action.payload.token)
+    },
+    authFailed: (state, action) => {
+      state.authStatus = 'failed'
+      state.authError = action.payload
+    },
+    logout: (state) => {
+      state.currentUser = null
+      state.token = null
+      state.isAuthenticated = false
+      state.authStatus = 'idle'
+      state.authError = null
+      localStorage.removeItem('flowboard:user')
+      localStorage.removeItem('flowboard:token')
+    },
+    renameCurrentUser: (state, action) => {
+      if (state.currentUser) state.currentUser.name = action.payload
+    },
+  },
+})
+
+export const userActions = userSlice.actions
+export default userSlice.reducer
+
+```
+
+===== FILE: src\styles.css =====
+```
+:root {
+  --accent: #2563eb;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #16a34a;
+  --ai: #7c3aed;
+  --ink: #172033;
+  --muted: #64748b;
+  --line: #dbe3ef;
+  --soft: #f8fafc;
+  --panel: #ffffff;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: #eef2f7;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(310px, 1fr) minmax(320px, 360px) minmax(360px, 1fr);
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.topbar-left,
+.topbar-right,
+.top-icon-group,
+.brand-mark,
+.presence,
+.avatar-stack,
+.segmented-actions,
+.panel-header,
+.side-panel-header,
+.modal-header,
+.modal-control-row,
+.card-meta,
+.card-actions,
+.label-row,
+.assignee-row,
+.modal-meta-row {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-left,
+.topbar-right {
+  min-width: 0;
+  gap: 10px;
+}
+
+.topbar-right {
+  justify-content: flex-end;
+}
+
+.brand-mark {
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.brand-mark svg {
+  color: var(--accent);
+}
+
+.separator {
+  color: var(--muted);
+}
+
+.board-switcher,
+.nav-link,
+.user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.board-switcher {
+  min-width: 0;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-switcher-wrap {
+  position: relative;
+}
+
+.board-dropdown {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  z-index: 12;
+  display: grid;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 38px rgba(23, 32, 51, 0.16);
+}
+
+.board-dropdown button,
+.board-dropdown span {
+  display: block;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.board-dropdown button:hover {
+  background: #eff6ff;
+  color: var(--accent);
+}
+
+.nav-link {
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.nav-link.active,
+.nav-link:hover {
+  color: var(--accent);
+  background: #eff6ff;
+}
+
+.quick-add {
+  position: relative;
+  width: 100%;
+}
+
+.quick-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-input svg {
+  position: absolute;
+  left: 11px;
+  color: var(--ai);
+}
+
+.quick-input input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--ink);
+  outline: none;
+}
+
+.quick-input input:focus,
+.task-modal input:focus,
+.task-modal textarea:focus,
+.task-modal select:focus,
+.column-title-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.ai-draft {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  right: 0;
+  z-index: 8;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--ai);
+  border-radius: 8px;
+  background: #f5f3ff;
+  box-shadow: 0 14px 34px rgba(23, 32, 51, 0.14);
+}
+
+.ai-draft span {
+  display: block;
+  margin-top: 2px;
+  color: var(--ai);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.presence {
+  gap: 8px;
+  color: var(--success);
+}
+
+.avatar-stack {
+  flex-direction: row;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  margin-left: -7px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: var(--avatar-color, var(--muted));
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.avatar.overflow {
+  width: 26px;
+  height: 26px;
+  background: var(--muted);
+}
+
+.icon-button,
+.toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+}
+
+.icon-button.compact {
+  width: 32px;
+  height: 32px;
+}
+
+.icon-button.ghost {
+  background: var(--soft);
+}
+
+.icon-button.active,
+.icon-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.icon-button.success {
+  border-color: var(--success);
+  background: var(--success);
+  color: #ffffff;
+}
+
+.toolbar-button {
+  min-height: 36px;
+  padding: 0 11px;
+}
+
+.toolbar-button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.toolbar-button.secondary {
+  background: var(--soft);
+}
+
+.top-icon-group {
+  gap: 6px;
+}
+
+.activity-toggle {
+  position: relative;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  z-index: 9;
+  display: grid;
+  width: 150px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 38px rgba(23, 32, 51, 0.16);
+}
+
+.user-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+  text-align: left;
+}
+
+.danger-text,
+.text-danger-button {
+  color: var(--danger) !important;
+}
+
+.workspace {
+  display: flex;
+  height: calc(100vh - 60px);
+  min-height: 0;
+  background: #eef2f7;
+}
+
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 20px;
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.12), transparent 36%),
+    linear-gradient(45deg, rgba(124, 58, 237, 0.08), transparent 34%),
+    #f8fafc;
+}
+
+.auth-card {
+  display: grid;
+  gap: 18px;
+  width: min(440px, 100%);
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(23, 32, 51, 0.14);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-brand svg {
+  color: var(--accent);
+}
+
+.auth-brand strong {
+  display: block;
+  font-size: 16px;
+}
+
+.auth-brand span,
+.auth-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.auth-card h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  letter-spacing: 0;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.auth-form input {
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: none;
+}
+
+.auth-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.auth-error {
+  margin: 0;
+  color: var(--danger) !important;
+  font-weight: 800;
+}
+
+.auth-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  color: var(--ai);
+  font-weight: 900;
+}
+
+.dashboard-sidebar {
+  display: flex;
+  flex: 0 0 188px;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.sidebar-logo,
+.sidebar-footer,
+.sidebar-nav button {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-logo {
+  gap: 10px;
+  padding: 8px;
+}
+
+.sidebar-logo svg {
+  color: var(--accent);
+}
+
+.sidebar-logo strong,
+.sidebar-footer strong {
+  display: block;
+  font-size: 13px;
+}
+
+.sidebar-logo span,
+.sidebar-footer span {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-nav button {
+  gap: 9px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.sidebar-nav button.active,
+.sidebar-nav button:hover {
+  background: #eff6ff;
+  color: var(--accent);
+}
+
+.sidebar-footer {
+  gap: 8px;
+  min-width: 0;
+  margin-top: auto;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.workspace-panel {
+  flex: 1;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  padding: 18px;
+  background: #f8fafc;
+}
+
+.workspace-panel-card {
+  display: grid;
+  justify-items: start;
+  width: min(520px, 100%);
+  gap: 12px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(23, 32, 51, 0.08);
+}
+
+.workspace-panel-card svg {
+  color: var(--accent);
+}
+
+.workspace-panel-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.workspace-panel-card h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.workspace-panel-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.workspace-list,
+.workspace-chip-grid,
+.collaborator-grid {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+}
+
+.workspace-list button,
+.workspace-list > div,
+.collaborator-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--ink);
+  text-align: left;
+}
+
+.workspace-list button:hover {
+  border-color: var(--accent);
+}
+
+.workspace-list strong,
+.collaborator-row strong {
+  font-size: 13px;
+}
+
+.workspace-list span,
+.collaborator-row span,
+.workspace-stat {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.collaborator-row {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.workspace-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.workspace-stat {
+  width: 100%;
+}
+
+.board-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.board-dashboard-header {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 18px 10px;
+}
+
+.project-title-block span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-title-block h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.date-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.date-switcher strong {
+  color: var(--ink);
+}
+
+.board-stat-row {
+  display: grid;
+  grid-template-columns: 170px 150px 150px minmax(260px, 1fr);
+  gap: 12px;
+  padding: 0 18px 14px;
+}
+
+.board-stat,
+.board-filter-bar {
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.board-stat {
+  padding: 11px 13px;
+}
+
+.board-stat span,
+.board-stat small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.board-stat strong {
+  display: inline-block;
+  margin-top: 5px;
+  margin-right: 5px;
+  color: var(--ink);
+  font-size: 22px;
+}
+
+.board-stat:nth-child(2) strong {
+  color: var(--danger);
+}
+
+.board-stat:nth-child(3) strong {
+  color: var(--success);
+}
+
+.board-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.board-filter-bar svg {
+  color: var(--muted);
+}
+
+.board-filter-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+}
+
+.board-filter-bar select {
+  height: 34px;
+  max-width: 140px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  outline: none;
+}
+
+.board-filter-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.board-scroll {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  height: calc(100% - 156px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 18px 18px;
+}
+
+.column,
+.add-column-button {
+  width: 252px;
+  flex: 0 0 252px;
+  border-radius: 8px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: #f1f5f9;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.column:nth-child(1) {
+  background: #fffbeb;
+}
+
+.column:nth-child(2) {
+  background: #eff6ff;
+}
+
+.column:nth-child(3) {
+  background: #f5f3ff;
+}
+
+.column:nth-child(4) {
+  background: #f0fdf4;
+}
+
+.column-over {
+  border-color: var(--accent);
+  background: #eff6ff;
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.column-title-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+.column-title-button,
+.column-title-input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+  text-align: left;
+}
+
+.column-title-button {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-title-input {
+  width: 150px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 7px;
+}
+
+.column-title-wrap span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.column-tools {
+  display: flex;
+  gap: 5px;
+}
+
+.task-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 80px;
+  overflow-y: auto;
+  padding: 2px 2px 8px;
+}
+
+.empty-drop-zone {
+  display: grid;
+  min-height: 80px;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.add-task-ghost,
+.add-column-button,
+.add-subtask-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.add-task-ghost {
+  width: 100%;
+  margin-top: 4px;
+  border: 0;
+  background: transparent;
+}
+
+.add-task-ghost:hover {
+  background: var(--soft);
+  color: var(--accent);
+}
+
+.add-column-button {
+  min-height: 118px;
+  border: 1px dashed var(--line);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.add-column-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.task-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04);
+  transition:
+    box-shadow 160ms ease,
+    border-color 600ms ease;
+}
+
+.task-card.priority-edge-high {
+  border-left-color: var(--danger);
+}
+
+.task-card.priority-edge-medium {
+  border-left-color: var(--warning);
+}
+
+.task-card.priority-edge-low {
+  border-left-color: var(--muted);
+}
+
+.task-card:hover,
+.task-card.dragging {
+  box-shadow: 0 8px 16px rgba(23, 32, 51, 0.12);
+}
+
+.card-drag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  color: var(--muted);
+}
+
+.card-body {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 30px 9px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-title-row h3 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.32;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ai-corner {
+  display: inline-flex;
+  color: var(--ai);
+}
+
+.label-row {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.priority,
+.label {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.priority {
+  padding: 3px 7px;
+}
+
+.priority.high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.priority.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.priority.low {
+  background: #f1f5f9;
+  color: var(--muted);
+}
+
+.label {
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--label) 14%, white);
+  color: var(--label);
+}
+
+.card-meta {
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mini-avatar-stack {
+  justify-content: flex-end;
+}
+
+.mini-avatar-stack .avatar {
+  margin-left: -6px;
+}
+
+.editing-badge {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  z-index: 2;
+  padding: 4px 8px;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(23, 32, 51, 0.12);
+}
+
+.card-actions {
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px 9px;
+  border-top: 1px solid #eef2f7;
+}
+
+.side-panel {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid transparent;
+  background: #ffffff;
+  transition:
+    width 180ms ease,
+    border-color 180ms ease;
+}
+
+.side-panel.open {
+  width: 316px;
+  border-left-color: var(--line);
+  box-shadow: -12px 0 28px rgba(23, 32, 51, 0.08);
+}
+
+.side-panel-header {
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 16px;
+}
+
+.panel-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.panel-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.panel {
+  padding: 12px;
+}
+
+.panel-header {
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.panel-header h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.panel-header span,
+.empty-text,
+.timeline-item small,
+.activity-item small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.timeline,
+.activity-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.timeline-item:hover {
+  background: var(--soft);
+}
+
+.timeline-item.current {
+  border-left-color: var(--accent);
+}
+
+.timeline-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.timeline-item strong,
+.activity-item p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.branch-note {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 9px;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.date-divider {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.activity-item {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.live-cursor {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+  transition:
+    left 180ms ease-out,
+    top 180ms ease-out,
+    opacity 180ms ease-out;
+}
+
+.cursor-arrow {
+  width: 0;
+  height: 0;
+  border-top: 9px solid var(--cursor-color);
+  border-right: 7px solid transparent;
+}
+
+.cursor-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 3px 3px;
+  border-radius: 999px;
+  background: var(--cursor-color);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(23, 32, 51, 0.46);
+}
+
+.task-modal {
+  display: grid;
+  gap: 14px;
+  width: min(600px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 18px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(23, 32, 51, 0.28);
+}
+
+.modal-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-header.compact {
+  margin-bottom: 8px;
+}
+
+.modal-title-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 850;
+  outline: none;
+}
+
+.modal-control-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+}
+
+.task-modal select,
+.task-modal input,
+.task-modal textarea {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  outline: none;
+}
+
+.task-modal select,
+.task-modal input {
+  padding: 0 9px;
+}
+
+.date-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.date-control input {
+  min-width: 0;
+  border: 0;
+}
+
+.description-field {
+  padding: 10px;
+  border-color: transparent;
+  background: var(--soft);
+  resize: vertical;
+}
+
+.subtask-box {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.subtask-box h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ai-suggestions {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px dashed var(--ai);
+  border-radius: 8px;
+  background: #f5f3ff;
+}
+
+.suggestion-header,
+.suggestion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.suggestion-row span {
+  flex: 1;
+  font-size: 13px;
+}
+
+.suggestion-header button,
+.suggestion-row button,
+.add-chip {
+  border: 0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ai);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.checkbox-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
+.add-subtask-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.modal-meta-row,
+.assignee-row {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.add-chip {
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.text-danger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.created-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.analytics-dashboard {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+  overflow: auto;
+  padding: 16px;
+}
+
+.metric-card {
+  min-height: 290px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.metric-card > span {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 7px;
+}
+
+.heat-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: #e2e8f0;
+}
+
+.heat-cell.level-1 {
+  background: #bfdbfe;
+}
+
+.heat-cell.level-2 {
+  background: #60a5fa;
+}
+
+.heat-cell.level-3 {
+  background: var(--accent);
+}
+
+.bottleneck-row {
+  display: grid;
+  grid-template-columns: 94px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+
+.bottleneck-row span {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.bottleneck-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--warning);
+}
+
+@media (max-width: 1024px) {
+  .dashboard-sidebar {
+    display: none;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr auto;
+    height: auto;
+    min-height: 60px;
+    padding: 10px 12px;
+  }
+
+  .quick-add {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .workspace {
+    height: calc(100vh - 112px);
+  }
+
+  .board-dashboard-header,
+  .board-stat-row {
+    grid-template-columns: 1fr;
+  }
+
+  .board-scroll {
+    height: calc(100% - 328px);
+  }
+
+  .side-panel.open {
+    position: fixed;
+    top: 60px;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    width: 316px;
+    box-shadow: -18px 0 40px rgba(23, 32, 51, 0.16);
+  }
+}
+
+@media (max-width: 767px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .board-switcher {
+    max-width: 150px;
+  }
+
+  .workspace {
+    height: calc(100vh - 154px);
+  }
+
+  .board-dashboard-header {
+    padding: 12px 12px 8px;
+  }
+
+  .board-stat-row {
+    display: none;
+  }
+
+  .board-scroll {
+    height: calc(100% - 86px);
+    padding: 0 12px 14px;
+  }
+
+  .board-scroll {
+    scroll-snap-type: x mandatory;
+  }
+
+  .column,
+  .add-column-button {
+    width: calc(100vw - 32px);
+    flex-basis: calc(100vw - 32px);
+    scroll-snap-align: start;
+  }
+
+  .side-panel.open {
+    top: 0;
+    width: 100vw;
+  }
+
+  .modal-control-row,
+  .analytics-dashboard,
+  .modal-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+```
