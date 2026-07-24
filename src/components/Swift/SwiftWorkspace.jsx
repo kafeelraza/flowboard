@@ -146,9 +146,7 @@ function Header({
   setActiveTab,
   searchQuery,
   setSearchQuery,
-  aiText,
-  setAiText,
-  parseAiTask,
+  openAiTask,
   aiStatus,
   currentUser,
   selectedAvatarId,
@@ -228,11 +226,10 @@ function Header({
       </div>
 
       <div className="header-right">
-        <div className="ai-quick-add">
+        <button className="ai-trigger-btn" onClick={openAiTask} disabled={aiStatus === 'loading'} title="Create task with AI">
           <Sparkles size={16} />
-          <input value={aiText} onChange={(event) => setAiText(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && parseAiTask()} placeholder="Fix navbar by Friday, high priority" />
-          <button onClick={parseAiTask} disabled={aiStatus === 'loading'}>{aiStatus === 'loading' ? 'AI...' : 'AI'}</button>
-        </div>
+          <span>{aiStatus === 'loading' ? 'Creating...' : 'AI Task'}</span>
+        </button>
         <div className="search-container">
           <Search size={16} className="search-icon" />
           <input className="search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search tasks..." />
@@ -633,6 +630,65 @@ function BoardNameModal({ isOpen, title, setTitle, onClose, onCreate }) {
   )
 }
 
+function AiTaskModal({
+  isOpen,
+  aiText,
+  setAiText,
+  aiStatus,
+  boardOptions,
+  targetBoardId,
+  setTargetBoardId,
+  onClose,
+  onCreate,
+}) {
+  if (!isOpen) return null
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content ai-task-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-header-left">
+            <h2>Create With AI</h2>
+          </div>
+          <button className="modal-close-btn" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="modal-section">
+            <span className="modal-section-title">Task instruction</span>
+            <textarea
+              className="modal-textarea ai-task-textarea"
+              value={aiText}
+              onChange={(event) => setAiText(event.target.value)}
+              placeholder="Add navbar fix in one board and mark it high priority"
+              rows={4}
+              autoFocus
+            />
+          </div>
+          <div className="modal-section">
+            <span className="modal-section-title">Target board</span>
+            <select className="modal-select" value={targetBoardId ?? ''} onChange={(event) => setTargetBoardId(event.target.value)}>
+              {boardOptions.map((item) => (
+                <option key={item.boardId} value={item.boardId}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
+            <small className="ai-task-hint">Board name written in the instruction will be auto-detected when it matches one of your boards.</small>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="save-btn" onClick={onCreate} disabled={aiStatus === 'loading' || !aiText.trim()}>
+            {aiStatus === 'loading' ? 'Creating...' : 'Create Task'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SwiftWorkspace() {
   const dispatch = useDispatch()
   const board = useSelector(selectBoard)
@@ -655,6 +711,8 @@ export function SwiftWorkspace() {
   const [inboxEntries, setInboxEntries] = useState([])
   const [aiText, setAiText] = useState('')
   const [aiStatus, setAiStatus] = useState('idle')
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false)
+  const [aiTargetBoardId, setAiTargetBoardId] = useState(currentBoardId)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteStatus, setInviteStatus] = useState(null)
   const [boardMembers, setBoardMembers] = useState([])
@@ -676,14 +734,18 @@ export function SwiftWorkspace() {
   }, [selectedAvatarId])
 
   useEffect(() => {
-    if (!boardsOpen || !token) return
+    if ((!boardsOpen && !isAiModalOpen) || !token) return
     fetch('/api/boards', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((response) => response.json())
       .then(setBoards)
       .catch(() => setBoards([]))
-  }, [boardsOpen, token])
+  }, [boardsOpen, isAiModalOpen, token])
+
+  useEffect(() => {
+    setAiTargetBoardId(currentBoardId)
+  }, [currentBoardId])
 
   useEffect(() => {
     if (!token || !inboxOpen) return
@@ -730,6 +792,15 @@ export function SwiftWorkspace() {
   }, [currentUser, onlineUsers])
 
   const columns = sourceColumns.map((column) => ({ id: column._id, title: column.title }))
+  const boardOptions = useMemo(() => {
+    const options = new Map()
+    if (board?._id) options.set(board._id, { boardId: board._id, title: board.title })
+    boards.forEach((item) => {
+      if (item.boardId) options.set(item.boardId, item)
+    })
+    return [...options.values()]
+  }, [board, boards])
+
   const tasks = sourceTasks.map((task) => {
     const category = task.labels.find((label) => ['design', 'dev', 'qa', 'marketing'].includes(label.text.toLowerCase()))?.text.toLowerCase() ?? task.labels[0]?.text.toLowerCase() ?? 'dev'
     return {
@@ -828,33 +899,87 @@ export function SwiftWorkspace() {
     setBoardsOpen(false)
   }
 
+  const detectBoardFromInstruction = (instruction) => {
+    const normalizedInstruction = instruction.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    return boardOptions.find((item) => {
+      const title = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+      if (!title) return false
+      return new RegExp(`(^|\\s)${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(normalizedInstruction)
+    })
+  }
+
+  const buildAiTask = (result, targetBoardId, targetColumnId, fallbackTitle) => {
+    const priorityFromText = /(^|\s)(urgent|high|important)(\s|$)/i.test(fallbackTitle) ? 'high' : null
+    return {
+      _id: createId('task'),
+      boardId: targetBoardId,
+      columnId: targetColumnId,
+      title: result.title ?? fallbackTitle,
+      description: 'Created from AI-assisted natural language quick add.',
+      subtasks: [],
+      labels: [{ text: 'ai', color: categoryColors.design }],
+      priority: result.priority ?? priorityFromText ?? 'medium',
+      dueDate: result.dueDate ?? null,
+      assigneeIds: currentUser?._id ? [currentUser._id] : [],
+      createdBy: currentUser?._id,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+  }
+
+  const addTaskToSavedBoard = async (targetBoardId, result, fallbackTitle) => {
+    const response = await fetch(`/api/boards/${targetBoardId}/state`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    const snapshot = await response.json()
+    if (!response.ok || !snapshot?.board || !snapshot?.tasks) throw new Error(snapshot?.error ?? 'Could not load target board')
+
+    const nextBoard = JSON.parse(JSON.stringify(snapshot.board))
+    const nextTasks = JSON.parse(JSON.stringify(snapshot.tasks))
+    const targetBoard = nextBoard.boardsById?.[targetBoardId]
+    const columnIds = targetBoard?.columns ?? nextBoard.columnOrder ?? []
+    const targetColumnId = columnIds.find((id) => nextBoard.columnsById?.[id]) ?? columnIds[0]
+    if (!targetColumnId) throw new Error('Target board has no column to receive this task')
+
+    const task = buildAiTask(result, targetBoardId, targetColumnId, fallbackTitle)
+    nextTasks.entities = { ...(nextTasks.entities ?? {}), [task._id]: task }
+    nextTasks.ids = [...new Set([...(nextTasks.ids ?? []), task._id])]
+    nextBoard.columnsById[targetColumnId].taskIds = [...(nextBoard.columnsById[targetColumnId].taskIds ?? []), task._id]
+
+    const saveResponse = await fetch(`/api/boards/${targetBoardId}/state`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ board: nextBoard, tasks: nextTasks }),
+    })
+    const saveResult = await saveResponse.json().catch(() => ({}))
+    if (!saveResponse.ok) throw new Error(saveResult.error ?? 'Could not save AI task')
+  }
+
   const parseAiTask = async () => {
-    if (!aiText.trim() || !board || !columns[0]) return
+    const instruction = aiText.trim()
+    const detectedBoard = detectBoardFromInstruction(instruction)
+    const targetBoardId = detectedBoard?.boardId ?? aiTargetBoardId ?? currentBoardId
+    if (!instruction || !targetBoardId) return
     setAiStatus('loading')
     try {
       const response = await fetch('/api/ai/parse-nl-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: aiText }),
+        body: JSON.stringify({ text: instruction }),
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? 'AI parse failed')
-      dispatch(markUndoable(taskActions.addTask({
-        _id: createId('task'),
-        boardId: board._id,
-        columnId: columns[0].id,
-        title: result.title ?? aiText,
-        description: 'Created from AI-assisted natural language quick add.',
-        subtasks: [],
-        labels: [{ text: 'ai', color: categoryColors.design }],
-        priority: result.priority ?? 'medium',
-        dueDate: result.dueDate ?? null,
-        assigneeIds: currentUser?._id ? [currentUser._id] : [],
-        createdBy: currentUser?._id,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      })))
+      if (targetBoardId === currentBoardId) {
+        if (!board || !columns[0]) throw new Error('Current board is not ready yet')
+        dispatch(markUndoable(taskActions.addTask(buildAiTask(result, board._id, columns[0].id, instruction))))
+      } else {
+        await addTaskToSavedBoard(targetBoardId, result, instruction)
+      }
       setAiText('')
+      setIsAiModalOpen(false)
       setAiStatus('idle')
     } catch (error) {
       setAiStatus('idle')
@@ -1155,9 +1280,7 @@ export function SwiftWorkspace() {
           setActiveTab={setActiveTab}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
-          aiText={aiText}
-          setAiText={setAiText}
-          parseAiTask={parseAiTask}
+          openAiTask={() => setIsAiModalOpen(true)}
           aiStatus={aiStatus}
           currentUser={currentUser}
           selectedAvatarId={selectedAvatarId}
@@ -1171,6 +1294,17 @@ export function SwiftWorkspace() {
       </main>
       <CardModal isOpen={isModalOpen} onClose={closeModal} task={modalTask} columnId={modalColumnId ?? columns[0]?.id} onSave={saveTask} onDelete={deleteTask} currentUser={currentUser} />
       <BoardNameModal isOpen={isBoardModalOpen} title={newBoardTitle} setTitle={setNewBoardTitle} onClose={() => setIsBoardModalOpen(false)} onCreate={confirmCreateBoard} />
+      <AiTaskModal
+        isOpen={isAiModalOpen}
+        aiText={aiText}
+        setAiText={setAiText}
+        aiStatus={aiStatus}
+        boardOptions={boardOptions}
+        targetBoardId={aiTargetBoardId ?? currentBoardId}
+        setTargetBoardId={setAiTargetBoardId}
+        onClose={() => setIsAiModalOpen(false)}
+        onCreate={parseAiTask}
+      />
     </div>
   )
 }
