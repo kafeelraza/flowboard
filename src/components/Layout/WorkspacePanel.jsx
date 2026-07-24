@@ -1,4 +1,5 @@
 import { Bell, CalendarDays, HelpCircle, Inbox, Layers, Settings, Users } from 'lucide-react'
+import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { uiActions } from '../../store/uiSlice.js'
 import { Avatar } from '../common/Avatar.jsx'
@@ -50,10 +51,14 @@ export function WorkspacePanel() {
   const activeSidebarItem = useSelector((state) => state.ui.activeSidebarItem)
   const selectedDate = useSelector((state) => state.ui.selectedDate)
   const currentBoardId = useSelector((state) => state.board.currentBoardId)
+  const board = useSelector((state) => state.board.boardsById[state.board.currentBoardId])
   const tasks = useSelector((state) => Object.values(state.tasks.entities).filter((task) => task.boardId === state.board.currentBoardId))
   const activity = useSelector((state) => state.activity.entries.filter((entry) => entry.boardId === state.board.currentBoardId).slice(0, 6))
   const users = useSelector((state) => state.presence.onlineUsers)
   const currentUser = useSelector((state) => state.user.currentUser)
+  const token = useSelector((state) => state.user.token)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteStatus, setInviteStatus] = useState(null)
   const config = viewConfig[activeSidebarItem] ?? viewConfig.Inbox
   const Icon = config.icon
   const dueTasks = tasks
@@ -62,6 +67,7 @@ export function WorkspacePanel() {
     .slice(0, 8)
   const labels = [...new Map(tasks.flatMap((task) => task.labels).map((label) => [label.text, label])).values()]
   const highPriorityCount = tasks.filter((task) => task.priority === 'high').length
+  const isBoardOwner = board?.ownerId === currentUser?._id
 
   const handleAction = () => {
     if (config.tab) {
@@ -70,6 +76,29 @@ export function WorkspacePanel() {
     }
     dispatch(uiActions.setActiveSidebarItem('Projects'))
     dispatch(uiActions.setActiveView('board'))
+  }
+
+  const inviteCollaborator = async (event) => {
+    event.preventDefault()
+    if (!inviteEmail.trim()) return
+    setInviteStatus({ type: 'loading', text: 'Inviting...' })
+
+    try {
+      const response = await fetch(`/api/boards/${currentBoardId}/invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? 'Invite failed')
+      setInviteEmail('')
+      setInviteStatus({ type: 'success', text: `${result.invitedUser.email} can now open this board.` })
+    } catch (error) {
+      setInviteStatus({ type: 'error', text: error.message })
+    }
   }
 
   const renderBody = () => {
@@ -104,6 +133,21 @@ export function WorkspacePanel() {
     if (activeSidebarItem === 'Collaborators') {
       return (
         <div className="collaborator-grid">
+          {isBoardOwner && (
+            <form className="invite-form" onSubmit={inviteCollaborator}>
+              <input
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+                type="email"
+                placeholder="teammate@example.com"
+              />
+              <button className="toolbar-button" disabled={inviteStatus?.type === 'loading'}>
+                Invite
+              </button>
+              {inviteStatus && <span className={`invite-status ${inviteStatus.type}`}>{inviteStatus.text}</span>}
+            </form>
+          )}
+          {!isBoardOwner && <p className="empty-text">Only the board owner can invite more collaborators.</p>}
           {users.map((user) => (
             <div key={user.userId} className="collaborator-row">
               <Avatar name={user.name} color={user.avatarColor} size={30} />

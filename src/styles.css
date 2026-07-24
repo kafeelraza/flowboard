@@ -609,6 +609,36 @@ button:disabled {
   gap: 8px;
 }
 
+.invite-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  width: 100%;
+}
+
+.invite-form input {
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: none;
+}
+
+.invite-status {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.invite-status.success {
+  color: var(--success);
+}
+
+.invite-status.error {
+  color: var(--danger);
+}
+
 .workspace-list button,
 .workspace-list > div,
 .collaborator-row {

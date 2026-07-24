@@ -44,6 +44,7 @@ const boardSnapshotSchema = new mongoose.Schema(
   {
     boardId: { type: String, index: true },
     ownerId: String,
+    members: [{ type: String, index: true }],
     title: String,
     state: mongoose.Schema.Types.Mixed,
   },
@@ -89,6 +90,16 @@ function publicUser(user) {
 
 function signToken(user) {
   return jwt.sign({ sub: user._id?.toString?.() ?? user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
+}
+
+function snapshotMemberIds(snapshot) {
+  const stateMembers = snapshot?.state?.board?.boardsById?.[snapshot.boardId]?.members ?? []
+  return [...new Set([snapshot?.ownerId, ...(snapshot?.members ?? []), ...stateMembers].filter(Boolean).map(String))]
+}
+
+function canAccessSnapshot(snapshot, userId) {
+  if (!snapshot?.ownerId || !userId) return true
+  return snapshotMemberIds(snapshot).includes(String(userId))
 }
 
 function authOptional(req, _res, next) {
@@ -179,7 +190,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/boards/:boardId/state', async (req, res) => {
   const { boardId } = req.params
   const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
-  if (snapshot?.ownerId && req.auth?.sub && snapshot.ownerId !== req.auth.sub) {
+  if (snapshot && req.auth?.sub && !canAccessSnapshot(snapshot, req.auth.sub)) {
     return res.status(403).json({ error: 'You do not have access to this board' })
   }
   res.json(snapshot?.state ?? null)
@@ -191,26 +202,57 @@ app.put('/api/boards/:boardId/state', async (req, res) => {
   const title = state?.board?.boardsById?.[boardId]?.title ?? 'FlowBoard'
   const ownerId = req.auth?.sub ?? state?.user?.currentUser?._id ?? 'local-user'
   const existing = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
-  if (existing?.ownerId && req.auth?.sub && existing.ownerId !== req.auth.sub) {
+  if (existing && req.auth?.sub && !canAccessSnapshot(existing, req.auth.sub)) {
     return res.status(403).json({ error: 'You do not have access to this board' })
   }
+  const members = state?.board?.boardsById?.[boardId]?.members ?? existing?.members ?? [ownerId]
 
   if (mongoReady) {
-    await BoardSnapshot.findOneAndUpdate({ boardId }, { boardId, ownerId, title, state }, { upsert: true, new: true })
+    await BoardSnapshot.findOneAndUpdate({ boardId }, { boardId, ownerId, members, title, state }, { upsert: true, new: true })
   } else {
-    memory.snapshots.set(boardId, { boardId, ownerId, title, state, updatedAt: new Date() })
+    memory.snapshots.set(boardId, { boardId, ownerId, members, title, state, updatedAt: new Date() })
   }
   res.json({ ok: true, savedAt: Date.now(), persistence: mongoReady ? 'mongodb' : 'memory' })
 })
 
 app.get('/api/boards', async (req, res) => {
   if (mongoReady) {
-    const query = req.auth?.sub ? { ownerId: req.auth.sub } : {}
+    const query = req.auth?.sub ? { $or: [{ ownerId: req.auth.sub }, { members: req.auth.sub }] } : {}
     const boards = await BoardSnapshot.find(query).sort({ updatedAt: -1 }).select('boardId title updatedAt')
     return res.json(boards)
   }
-  const boards = [...memory.snapshots.values()].filter((item) => !req.auth?.sub || item.ownerId === req.auth.sub)
+  const boards = [...memory.snapshots.values()].filter((item) => !req.auth?.sub || snapshotMemberIds(item).includes(req.auth.sub))
   res.json(boards.map((item) => ({ boardId: item.boardId, title: item.title, updatedAt: item.updatedAt })))
+})
+
+app.post('/api/boards/:boardId/invite', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId } = req.params
+  const email = String(req.body.email ?? '').trim().toLowerCase()
+  if (!email) return res.status(400).json({ error: 'Email is required' })
+
+  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (String(snapshot.ownerId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the owner can invite collaborators' })
+
+  const user = mongoReady ? await User.findOne({ email }) : memory.users.get(email)
+  if (!user) return res.status(404).json({ error: 'User must sign up before they can be invited' })
+
+  const invitedUser = publicUser(user)
+  const members = [...new Set([...snapshotMemberIds(snapshot), invitedUser._id])]
+  const state = snapshot.state
+  const board = state?.board?.boardsById?.[boardId]
+  if (board) {
+    board.members = members
+  }
+
+  if (mongoReady) {
+    await BoardSnapshot.findOneAndUpdate({ boardId }, { members, state }, { new: true })
+  } else {
+    memory.snapshots.set(boardId, { ...snapshot, members, state })
+  }
+
+  res.json({ ok: true, invitedUser, members })
 })
 
 app.get('/api/boards/:boardId/activity', async (req, res) => {
