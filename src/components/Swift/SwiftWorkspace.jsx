@@ -763,6 +763,9 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
   const messagesEndRef = useRef(null)
   const [contextMenu, setContextMenu] = useState(null)
   const [reactionPickerId, setReactionPickerId] = useState(null)
+  const [reactionPickerPlacement, setReactionPickerPlacement] = useState('above')
+  const [editingMessageId, setEditingMessageId] = useState(null)
+  const [editingText, setEditingText] = useState('')
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ block: 'end' })
@@ -812,6 +815,7 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
           messages.map((message) => {
             const isMine = String(message.userId) === String(currentUser?._id)
             const messageKey = message._id ?? `${message.userId}-${message.timestamp}`
+            const isEditing = editingMessageId === messageKey
             const reactionCounts = chatReactions
               .map((emoji) => ({
                 emoji,
@@ -839,7 +843,43 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
                     <span>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     {message.editedAt && <span>edited</span>}
                   </small>
-                  <p>{message.deletedAt ? 'This message was deleted.' : message.text}</p>
+                  {isEditing ? (
+                    <form
+                      className="chat-inline-edit"
+                      onSubmit={async (event) => {
+                        event.preventDefault()
+                        const nextText = editingText.trim()
+                        if (!nextText || nextText === message.text) {
+                          setEditingMessageId(null)
+                          return
+                        }
+                        await onEdit(message, nextText)
+                        setEditingMessageId(null)
+                      }}
+                    >
+                      <textarea
+                        autoFocus
+                        value={editingText}
+                        onChange={(event) => setEditingText(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') {
+                            event.preventDefault()
+                            setEditingMessageId(null)
+                          }
+                          if (event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault()
+                            event.currentTarget.form?.requestSubmit()
+                          }
+                        }}
+                      />
+                      <div>
+                        <button type="button" onClick={() => setEditingMessageId(null)}>Cancel</button>
+                        <button type="submit" disabled={!editingText.trim()}>Save</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <p>{message.deletedAt ? 'This message was deleted.' : message.text}</p>
+                  )}
                   {!message.deletedAt && (
                     <>
                     <button
@@ -849,13 +889,16 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
                       onClick={(event) => {
                         event.stopPropagation()
                         setContextMenu(null)
+                        const bubble = event.currentTarget.closest('.chat-message')
+                        const bounds = bubble?.getBoundingClientRect()
+                        setReactionPickerPlacement(bounds && bounds.top < window.innerHeight / 2 ? 'below' : 'above')
                         setReactionPickerId(reactionPickerId === messageKey ? null : messageKey)
                       }}
                     >
                       {'\u263A'}
                     </button>
                     {reactionPickerId === messageKey && (
-                      <div className="chat-reaction-palette" onClick={(event) => event.stopPropagation()}>
+                      <div className={`chat-reaction-palette ${reactionPickerPlacement}`} onClick={(event) => event.stopPropagation()}>
                         {chatReactions.map((emoji) => (
                           <button
                             key={emoji}
@@ -928,7 +971,9 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
               <button
                 type="button"
                 onClick={() => {
-                  onEdit(contextMenu.message)
+                  const messageKey = contextMenu.message._id ?? `${contextMenu.message.userId}-${contextMenu.message.timestamp}`
+                  setEditingMessageId(messageKey)
+                  setEditingText(contextMenu.message.text ?? '')
                   setContextMenu(null)
                 }}
               >
@@ -1450,8 +1495,7 @@ export function SwiftWorkspace() {
     setChatMessages((items) => items.map((item) => (String(item._id) === String(updated._id) ? updated : item)))
   }
 
-  const editChatMessage = async (message) => {
-    const text = window.prompt('Edit message', message.text)
+  const editChatMessage = async (message, text) => {
     if (!text?.trim() || text.trim() === message.text) return
     try {
       await updateChatMessage(message, { text: text.trim() })

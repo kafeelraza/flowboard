@@ -2873,6 +2873,73 @@ body,
   color: #fff;
 }
 
+.chat-inline-edit {
+  display: grid;
+  gap: 8px;
+  min-width: min(240px, 64vw);
+}
+
+.chat-inline-edit textarea {
+  width: 100%;
+  min-height: 68px;
+  resize: vertical;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.4;
+  outline: none;
+}
+
+.chat-message.mine .chat-inline-edit textarea {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.chat-inline-edit textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.chat-inline-edit div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.chat-inline-edit button {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.chat-inline-edit button[type='submit'] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.chat-inline-edit button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.chat-message.mine .chat-inline-edit button {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.chat-message.mine .chat-inline-edit button[type='submit'] {
+  background: #fff;
+  color: var(--accent);
+}
+
 .chat-message em {
   display: block;
   margin-top: 5px;
@@ -2942,6 +3009,16 @@ body,
   padding: 6px;
   background: var(--bg-secondary);
   box-shadow: 0 16px 38px rgba(15, 23, 42, 0.16);
+}
+
+.chat-reaction-palette.below {
+  top: calc(100% + 9px);
+  bottom: auto;
+}
+
+.chat-reaction-palette.above {
+  top: auto;
+  bottom: calc(100% + 9px);
 }
 
 .chat-message.mine .chat-reaction-palette {
