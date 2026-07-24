@@ -62,6 +62,7 @@ export function WorkspacePanel() {
   const [inviteStatus, setInviteStatus] = useState(null)
   const [boardMembers, setBoardMembers] = useState([])
   const [membersStatus, setMembersStatus] = useState('idle')
+  const [inboxEntries, setInboxEntries] = useState([])
   const config = viewConfig[activeSidebarItem] ?? viewConfig.Inbox
   const Icon = config.icon
   const dueTasks = tasks
@@ -99,6 +100,29 @@ export function WorkspacePanel() {
       cancelled = true
     }
   }, [activeSidebarItem, currentBoardId, token])
+
+  useEffect(() => {
+    if (activeSidebarItem !== 'Inbox' || !token) return
+    let cancelled = false
+
+    const loadInbox = async () => {
+      try {
+        const response = await fetch('/api/activity/inbox', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error ?? 'Could not load inbox')
+        if (!cancelled) setInboxEntries(result)
+      } catch {
+        if (!cancelled) setInboxEntries([])
+      }
+    }
+
+    loadInbox()
+    return () => {
+      cancelled = true
+    }
+  }, [activeSidebarItem, token])
 
   const handleAction = () => {
     if (config.tab) {
@@ -157,15 +181,16 @@ export function WorkspacePanel() {
 
   const renderBody = () => {
     if (activeSidebarItem === 'Inbox') {
+      const entries = [...inboxEntries, ...activity]
       return (
         <div className="workspace-list">
-          {activity.map((entry) => (
-            <button key={entry.id} onClick={() => dispatch(uiActions.setSidePanelTab('activity'))}>
+          {entries.map((entry) => (
+            <button key={entry.id ?? entry._id} onClick={() => dispatch(uiActions.setSidePanelTab('activity'))}>
               <strong>{entry.userName}</strong>
               <span>{entry.action.replaceAll('_', ' ')}: {entry.targetTitle}</span>
             </button>
           ))}
-          {activity.length === 0 && <p>No inbox updates yet.</p>}
+          {entries.length === 0 && <p>No inbox updates yet.</p>}
         </div>
       )
     }

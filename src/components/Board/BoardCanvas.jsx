@@ -28,6 +28,8 @@ export function BoardCanvas() {
   })
 
   const createNewBoard = () => {
+    const title = window.prompt('Board name', `Untitled Board ${boardCount + 1}`)
+    if (!title?.trim()) return
     const boardId = createId('board')
     const starterColumns = ['Backlog', 'In Progress', 'Review', 'Done'].map((title, order) => ({
       _id: createId('col'),
@@ -41,7 +43,7 @@ export function BoardCanvas() {
         boardActions.createBoard({
           board: {
             _id: boardId,
-            title: `Untitled Board ${boardCount + 1}`,
+            title: title.trim(),
             ownerId: currentUser?._id,
             members: currentUser?._id ? [currentUser._id] : [],
             columns: starterColumns.map((column) => column._id),

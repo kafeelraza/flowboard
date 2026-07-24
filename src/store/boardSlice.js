@@ -22,6 +22,17 @@ const boardSlice = createSlice({
       state.currentBoardId = board._id
       state.columnOrder = columns.map((column) => column._id)
     },
+    deleteBoard: (state, action) => {
+      const boardId = action.payload
+      const columnIds = state.boardsById[boardId]?.columns ?? []
+      columnIds.forEach((columnId) => {
+        delete state.columnsById[columnId]
+      })
+      delete state.boardsById[boardId]
+      const nextBoardId = Object.keys(state.boardsById)[0] ?? null
+      state.currentBoardId = nextBoardId
+      state.columnOrder = nextBoardId ? state.boardsById[nextBoardId]?.columns ?? [] : []
+    },
     addColumn: (state, action) => {
       const column = action.payload
       state.columnsById[column._id] = column

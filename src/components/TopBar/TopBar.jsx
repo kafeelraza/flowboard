@@ -15,8 +15,11 @@ export function TopBar() {
   const board = useSelector(selectBoard)
   const activeView = useSelector((state) => state.ui.activeView)
   const token = useSelector((state) => state.user.token)
+  const currentUser = useSelector((state) => state.user.currentUser)
+  const boardCount = useSelector((state) => Object.keys(state.board.boardsById).length)
   const [boardsOpen, setBoardsOpen] = useState(false)
   const [boards, setBoards] = useState([])
+  const canDeleteCurrentBoard = board?.ownerId === currentUser?._id
 
   useEffect(() => {
     if (!boardsOpen) return
@@ -42,6 +45,27 @@ export function TopBar() {
     }
   }
 
+  const deleteCurrentBoard = async () => {
+    if (!board || !canDeleteCurrentBoard) return
+    const ok = window.confirm(`Delete "${board.title}"? This cannot be undone.`)
+    if (!ok) return
+
+    const response = await fetch(`/api/boards/${board._id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      window.alert(result.error ?? 'Could not delete board')
+      return
+    }
+
+    dispatch(taskActions.deleteTasksByBoard(board._id))
+    dispatch(boardActions.deleteBoard(board._id))
+    setBoards((items) => items.filter((item) => item.boardId !== board._id))
+    setBoardsOpen(false)
+  }
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -52,7 +76,7 @@ export function TopBar() {
         <span className="separator">/</span>
         <div className="board-switcher-wrap">
           <button className="board-switcher" onClick={() => setBoardsOpen((value) => !value)}>
-            {board.title}
+            {board?.title ?? 'No board selected'}
             <ChevronDown size={15} />
           </button>
           {boardsOpen && (
@@ -65,6 +89,11 @@ export function TopBar() {
                     {item.title}
                   </button>
                 ))
+              )}
+              {canDeleteCurrentBoard && boardCount > 1 && (
+                <button className="danger-text" onClick={deleteCurrentBoard}>
+                  Delete current board
+                </button>
               )}
             </div>
           )}

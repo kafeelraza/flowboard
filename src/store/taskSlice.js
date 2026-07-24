@@ -14,6 +14,13 @@ const taskSlice = createSlice({
       tasksAdapter.setAll(state, Object.values(action.payload.entities ?? {}))
     },
     addTask: tasksAdapter.addOne,
+    deleteTasksByBoard: (state, action) => {
+      const boardId = action.payload
+      const ids = Object.values(state.entities)
+        .filter((task) => task?.boardId === boardId)
+        .map((task) => task._id)
+      tasksAdapter.removeMany(state, ids)
+    },
     updateTask: (state, action) => {
       const { taskId, changes } = action.payload
       tasksAdapter.updateOne(state, { id: taskId, changes: { ...changes, updatedAt: Date.now() } })

@@ -55,6 +55,7 @@ const activitySchema = new mongoose.Schema(
   {
     boardId: String,
     userId: String,
+    recipientId: { type: String, index: true },
     userName: String,
     action: String,
     targetTitle: String,
@@ -274,6 +275,24 @@ app.get('/api/boards', async (req, res) => {
   res.json(boards.map((item) => ({ boardId: item.boardId, title: item.title, updatedAt: item.updatedAt })))
 })
 
+app.delete('/api/boards/:boardId', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId } = req.params
+  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (String(snapshot.ownerId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the owner can delete this board' })
+
+  if (mongoReady) {
+    await BoardSnapshot.deleteOne({ boardId })
+    await Activity.deleteMany({ boardId })
+  } else {
+    memory.snapshots.delete(boardId)
+    memory.activity = memory.activity.filter((entry) => entry.boardId !== boardId)
+  }
+
+  res.json({ ok: true })
+})
+
 app.post('/api/boards/:boardId/invite', async (req, res) => {
   if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
   const { boardId } = req.params
@@ -300,8 +319,27 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
 
   if (mongoReady) {
     await BoardSnapshot.findOneAndUpdate({ boardId }, { members, state }, { new: true })
+    await Activity.create({
+      boardId,
+      userId: req.auth.sub,
+      recipientId: invitedUser._id,
+      userName: req.auth.email ?? 'A teammate',
+      action: 'invited_to_board',
+      targetTitle: board?.title ?? snapshot.title ?? 'a board',
+      timestamp: Date.now(),
+    })
   } else {
     memory.snapshots.set(boardId, { ...snapshot, members, state })
+    memory.activity.unshift({
+      id: `activity-${Date.now()}`,
+      boardId,
+      userId: req.auth.sub,
+      recipientId: invitedUser._id,
+      userName: req.auth.email ?? 'A teammate',
+      action: 'invited_to_board',
+      targetTitle: board?.title ?? snapshot.title ?? 'a board',
+      timestamp: Date.now(),
+    })
   }
 
   res.json({ ok: true, invitedUser, ownerId: snapshot.ownerId, members })
@@ -352,6 +390,14 @@ app.get('/api/boards/:boardId/activity', async (req, res) => {
     return res.json(await Activity.find({ boardId }).sort({ timestamp: -1 }).limit(50))
   }
   res.json(memory.activity.filter((item) => item.boardId === boardId).slice(0, 50))
+})
+
+app.get('/api/activity/inbox', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  if (mongoReady) {
+    return res.json(await Activity.find({ recipientId: req.auth.sub }).sort({ timestamp: -1 }).limit(50))
+  }
+  res.json(memory.activity.filter((item) => item.recipientId === req.auth.sub).slice(0, 50))
 })
 
 app.post('/api/boards/:boardId/activity', async (req, res) => {
