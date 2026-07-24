@@ -18,6 +18,12 @@ const buildSnapshot = (state) => ({
 })
 
 const saveSnapshot = async (state) => {
+  if (!state.board.currentBoardId) {
+    localStorage.removeItem(LOCAL_KEY)
+    localStorage.removeItem(LAST_WRITE_KEY)
+    return
+  }
+
   const snapshot = buildSnapshot(state)
   localStorage.setItem(LOCAL_KEY, JSON.stringify(snapshot))
   localStorage.setItem(LAST_WRITE_KEY, String(snapshot.savedAt))
@@ -41,6 +47,7 @@ export const flushOfflineQueue = async (state) => {
   if (!navigator.onLine || queue.length === 0) return
 
   for (const item of queue) {
+    if (!item.snapshot.board.currentBoardId) continue
     await fetch(`/api/boards/${item.snapshot.board.currentBoardId}/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders(state) },
