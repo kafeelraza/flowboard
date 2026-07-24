@@ -1,6 +1,7 @@
 import { Bell, CalendarDays, HelpCircle, Inbox, Layers, Settings, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { boardActions } from '../../store/boardSlice.js'
 import { uiActions } from '../../store/uiSlice.js'
 import { Avatar } from '../common/Avatar.jsx'
 
@@ -126,6 +127,7 @@ export function WorkspacePanel() {
       if (!response.ok) throw new Error(result.error ?? 'Invite failed')
       setInviteEmail('')
       setInviteStatus({ type: 'success', text: `${result.invitedUser.email} can now open this board.` })
+      dispatch(boardActions.setBoardMembers({ boardId: currentBoardId, ownerId: result.ownerId, members: result.members }))
       setBoardMembers((members) => {
         if (members.some((member) => member._id === result.invitedUser._id)) return members
         return [...members, { ...result.invitedUser, role: 'Collaborator' }]
@@ -144,6 +146,7 @@ export function WorkspacePanel() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? 'Could not remove collaborator')
+      dispatch(boardActions.setBoardMembers({ boardId: currentBoardId, members: result.members }))
       setBoardMembers((members) => members.filter((member) => member._id !== userId))
       setMembersStatus('ready')
     } catch (error) {

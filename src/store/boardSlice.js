@@ -38,6 +38,15 @@ const boardSlice = createSlice({
       const { columnId, title } = action.payload
       state.columnsById[columnId].title = title
     },
+    setBoardMembers: (state, action) => {
+      const { boardId = state.currentBoardId, ownerId, members } = action.payload
+      const board = state.boardsById[boardId]
+      if (board) {
+        if (ownerId) board.ownerId = ownerId
+        board.members = members
+        board.updatedAt = Date.now()
+      }
+    },
     reorderColumns: (state, action) => {
       state.columnOrder = action.payload.columnOrder
       state.columnOrder.forEach((id, order) => {

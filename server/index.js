@@ -102,6 +102,34 @@ function canAccessSnapshot(snapshot, userId) {
   return snapshotMemberIds(snapshot).includes(String(userId))
 }
 
+function isLegacyUserId(userId) {
+  return !userId || !mongoose.Types.ObjectId.isValid(String(userId))
+}
+
+async function normalizeSnapshotOwnership(snapshot, userId) {
+  if (!snapshot || !userId || !isLegacyUserId(snapshot.ownerId)) return snapshot
+
+  const members = [...new Set([String(userId), ...snapshotMemberIds(snapshot).filter((id) => !isLegacyUserId(id))])]
+  const state = snapshot.state
+  const board = state?.board?.boardsById?.[snapshot.boardId]
+  if (board) {
+    board.ownerId = String(userId)
+    board.members = members
+  }
+
+  snapshot.ownerId = String(userId)
+  snapshot.members = members
+  snapshot.state = state
+
+  if (mongoReady) {
+    await BoardSnapshot.findOneAndUpdate({ boardId: snapshot.boardId }, { ownerId: snapshot.ownerId, members, state }, { new: true })
+  } else {
+    memory.snapshots.set(snapshot.boardId, { ...snapshot, ownerId: snapshot.ownerId, members, state })
+  }
+
+  return snapshot
+}
+
 async function publicUsersByIds(userIds) {
   const ids = [...new Set(userIds.filter(Boolean).map(String))]
   if (ids.length === 0) return []
@@ -199,7 +227,10 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/boards/:boardId/state', async (req, res) => {
   const { boardId } = req.params
-  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  let snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (snapshot && req.auth?.sub && canAccessSnapshot(snapshot, req.auth.sub)) {
+    snapshot = await normalizeSnapshotOwnership(snapshot, req.auth.sub)
+  }
   if (snapshot && req.auth?.sub && !canAccessSnapshot(snapshot, req.auth.sub)) {
     return res.status(403).json({ error: 'You do not have access to this board' })
   }
@@ -211,16 +242,24 @@ app.put('/api/boards/:boardId/state', async (req, res) => {
   const state = req.body
   const title = state?.board?.boardsById?.[boardId]?.title ?? 'FlowBoard'
   const ownerId = req.auth?.sub ?? state?.user?.currentUser?._id ?? 'local-user'
-  const existing = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  let existing = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (existing && req.auth?.sub && canAccessSnapshot(existing, req.auth.sub)) {
+    existing = await normalizeSnapshotOwnership(existing, req.auth.sub)
+  }
   if (existing && req.auth?.sub && !canAccessSnapshot(existing, req.auth.sub)) {
     return res.status(403).json({ error: 'You do not have access to this board' })
   }
-  const members = state?.board?.boardsById?.[boardId]?.members ?? existing?.members ?? [ownerId]
+  const effectiveOwnerId = existing?.ownerId ?? ownerId
+  const members = [...new Set([effectiveOwnerId, ...(state?.board?.boardsById?.[boardId]?.members ?? existing?.members ?? [ownerId])].filter(Boolean).map(String))]
+  if (state?.board?.boardsById?.[boardId]) {
+    state.board.boardsById[boardId].ownerId = effectiveOwnerId
+    state.board.boardsById[boardId].members = members
+  }
 
   if (mongoReady) {
-    await BoardSnapshot.findOneAndUpdate({ boardId }, { boardId, ownerId, members, title, state }, { upsert: true, new: true })
+    await BoardSnapshot.findOneAndUpdate({ boardId }, { boardId, ownerId: effectiveOwnerId, members, title, state }, { upsert: true, new: true })
   } else {
-    memory.snapshots.set(boardId, { boardId, ownerId, members, title, state, updatedAt: new Date() })
+    memory.snapshots.set(boardId, { boardId, ownerId: effectiveOwnerId, members, title, state, updatedAt: new Date() })
   }
   res.json({ ok: true, savedAt: Date.now(), persistence: mongoReady ? 'mongodb' : 'memory' })
 })
@@ -241,15 +280,18 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
   const email = String(req.body.email ?? '').trim().toLowerCase()
   if (!email) return res.status(400).json({ error: 'Email is required' })
 
-  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  let snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
   if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (canAccessSnapshot(snapshot, req.auth.sub)) {
+    snapshot = await normalizeSnapshotOwnership(snapshot, req.auth.sub)
+  }
   if (!canAccessSnapshot(snapshot, req.auth.sub)) return res.status(403).json({ error: 'You do not have access to this board' })
 
   const user = mongoReady ? await User.findOne({ email }) : memory.users.get(email)
   if (!user) return res.status(404).json({ error: 'User must sign up before they can be invited' })
 
   const invitedUser = publicUser(user)
-  const members = [...new Set([...snapshotMemberIds(snapshot), invitedUser._id])]
+  const members = [...new Set([snapshot.ownerId, ...snapshotMemberIds(snapshot).filter((id) => !isLegacyUserId(id)), invitedUser._id].filter(Boolean).map(String))]
   const state = snapshot.state
   const board = state?.board?.boardsById?.[boardId]
   if (board) {
@@ -262,14 +304,17 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
     memory.snapshots.set(boardId, { ...snapshot, members, state })
   }
 
-  res.json({ ok: true, invitedUser, members })
+  res.json({ ok: true, invitedUser, ownerId: snapshot.ownerId, members })
 })
 
 app.get('/api/boards/:boardId/members', async (req, res) => {
   if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
   const { boardId } = req.params
-  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  let snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
   if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (canAccessSnapshot(snapshot, req.auth.sub)) {
+    snapshot = await normalizeSnapshotOwnership(snapshot, req.auth.sub)
+  }
   if (!canAccessSnapshot(snapshot, req.auth.sub)) return res.status(403).json({ error: 'You do not have access to this board' })
 
   const members = await publicUsersByIds(snapshotMemberIds(snapshot))
