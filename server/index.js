@@ -278,8 +278,11 @@ app.get('/api/boards', async (req, res) => {
 app.delete('/api/boards/:boardId', async (req, res) => {
   if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
   const { boardId } = req.params
-  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  let snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
   if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (canAccessSnapshot(snapshot, req.auth.sub)) {
+    snapshot = await normalizeSnapshotOwnership(snapshot, req.auth.sub)
+  }
   if (String(snapshot.ownerId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the owner can delete this board' })
 
   if (mongoReady) {
