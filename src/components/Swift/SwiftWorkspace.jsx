@@ -1166,28 +1166,101 @@ export function SwiftWorkspace() {
     }
 
     if (activeTab === 'analytics') {
+      const completedColumnId = columns.at(-1)?.id
+      const doneCount = tasks.filter((task) => task.columnId === completedColumnId).length
+      const overdueCount = tasks.filter((task) => task.dueDate && isOverdue(task.dueDate) && task.columnId !== completedColumnId).length
+      const highPriorityCount = tasks.filter((task) => task.priority === 'high').length
+      const aiTaskCount = tasks.filter((task) => task.tags.includes('ai') || task.original.labels.some((label) => label.text.toLowerCase() === 'ai')).length
+      const completionRate = Math.round((doneCount / Math.max(tasks.length, 1)) * 100)
+      const priorityRows = ['high', 'medium', 'low'].map((priority) => {
+        const count = tasks.filter((task) => task.priority === priority).length
+        return { priority, count, percentage: Math.round((count / Math.max(tasks.length, 1)) * 100) }
+      })
+      const nextAction =
+        overdueCount > 0
+          ? `Focus ${overdueCount} overdue task${overdueCount === 1 ? '' : 's'} before adding new work.`
+          : highPriorityCount > 0
+            ? `Move ${highPriorityCount} high-priority task${highPriorityCount === 1 ? '' : 's'} toward review.`
+            : 'Board looks calm. Add due dates to improve forecasting.'
+
       return (
-        <div className="list-view-container" style={{ gap: '24px' }}>
-          <div className="dashboard-card" style={{ padding: '24px', cursor: 'default' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '20px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BarChart3 size={18} style={{ color: 'var(--accent)' }} />
-              Workflow Distribution
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="list-view-container analytics-view">
+          <div className="analytics-summary-grid">
+            <div className="analytics-metric">
+              <span>Completion</span>
+              <strong>{completionRate}%</strong>
+              <small>{doneCount} of {tasks.length} tasks done</small>
+            </div>
+            <div className="analytics-metric">
+              <span>Overdue</span>
+              <strong>{overdueCount}</strong>
+              <small>Needs attention now</small>
+            </div>
+            <div className="analytics-metric">
+              <span>High Priority</span>
+              <strong>{highPriorityCount}</strong>
+              <small>Critical work in board</small>
+            </div>
+            <div className="analytics-metric">
+              <span>AI Created</span>
+              <strong>{aiTaskCount}</strong>
+              <small>Tasks drafted with AI</small>
+            </div>
+          </div>
+
+          <div className="analytics-grid">
+            <section className="analytics-panel">
+              <h3>
+                <BarChart3 size={18} />
+                Workflow Distribution
+              </h3>
+              <div className="analytics-bars">
               {columns.map((column) => {
                 const count = tasks.filter((task) => task.columnId === column.id).length
                 const percentage = tasks.length > 0 ? (count / tasks.length) * 100 : 0
                 return (
-                  <div key={column.id} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <span style={{ width: '100px', fontSize: '13px', fontWeight: 500 }}>{column.title}</span>
-                    <div style={{ flex: 1, height: '14px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${percentage}%`, background: 'linear-gradient(90deg, var(--accent), #8b5cf6)', borderRadius: '6px' }} />
+                    <div key={column.id} className="analytics-bar-row">
+                      <span>{column.title}</span>
+                      <div>
+                        <i style={{ width: `${percentage}%` }} />
+                      </div>
+                      <strong>{count}</strong>
                     </div>
-                    <span style={{ width: '30px', fontSize: '13px', fontWeight: 700, textAlign: 'right' }}>{count}</span>
-                  </div>
                 )
               })}
-            </div>
+              </div>
+            </section>
+
+            <section className="analytics-panel">
+              <h3>
+                <ListFilter size={18} />
+                Priority Split
+              </h3>
+              <div className="priority-chart">
+                {priorityRows.map((row) => (
+                  <div key={row.priority} className={`priority-row priority-${row.priority}`}>
+                    <span>{row.priority}</span>
+                    <div>
+                      <i style={{ width: `${row.percentage}%` }} />
+                    </div>
+                    <strong>{row.count}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="analytics-panel analytics-insight">
+              <h3>
+                <Sparkles size={18} />
+                AI Board Insight
+              </h3>
+              <p>{nextAction}</p>
+              <div className="insight-pills">
+                <span>{boardMembers.length || 1} member{(boardMembers.length || 1) === 1 ? '' : 's'}</span>
+                <span>{columns.length} stages</span>
+                <span>{activity.length} recent updates</span>
+              </div>
+            </section>
           </div>
         </div>
       )
