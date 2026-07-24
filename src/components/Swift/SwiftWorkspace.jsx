@@ -40,11 +40,14 @@ import { presenceActions } from '../../store/presenceSlice.js'
 import { taskActions } from '../../store/taskSlice.js'
 import { userActions } from '../../store/userSlice.js'
 
-const avatarImages = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80',
+const avatarOptions = [
+  { id: 'bolt', emoji: '⚡', colors: ['#5f5af6', '#a855f7'] },
+  { id: 'rocket', emoji: '🚀', colors: ['#0284c7', '#22d3ee'] },
+  { id: 'fire', emoji: '🔥', colors: ['#ef4444', '#f97316'] },
+  { id: 'leaf', emoji: '🌿', colors: ['#16a34a', '#84cc16'] },
+  { id: 'moon', emoji: '🌙', colors: ['#334155', '#7c3aed'] },
+  { id: 'star', emoji: '⭐', colors: ['#f59e0b', '#facc15'] },
+  { id: 'gem', emoji: '💎', colors: ['#06b6d4', '#6366f1'] },
 ]
 
 const categoryColors = {
@@ -62,9 +65,13 @@ const menuItems = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
-const avatarFor = (userId = 'user') => {
+const avatarFor = (userId = 'user', preferredAvatarId = null) => {
+  const selected = preferredAvatarId ? avatarOptions.find((avatar) => avatar.id === preferredAvatarId) : null
   const score = [...userId].reduce((total, char) => total + char.charCodeAt(0), 0)
-  return avatarImages[score % avatarImages.length]
+  const avatar = selected ?? avatarOptions[score % avatarOptions.length]
+  const [start, end] = avatar.colors
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="100" height="100" rx="28" fill="url(#g)"/><text x="50" y="58" font-size="42" text-anchor="middle" dominant-baseline="middle">${avatar.emoji}</text></svg>`
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
 const formatDate = (dateStr) => {
@@ -79,7 +86,7 @@ const isOverdue = (dateStr) => {
   return new Date(`${dateStr}T00:00:00`) < today
 }
 
-function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user, onLogout }) {
+function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user, selectedAvatarId, onLogout }) {
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
@@ -104,7 +111,7 @@ function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user, onLog
       <div className="sidebar-footer">
         <div className="user-profile">
           <div className="avatar-wrapper">
-            <img className="avatar" src={avatarFor(user?._id)} alt={user?.name ?? 'User'} />
+            <img className="avatar" src={avatarFor(user?._id, selectedAvatarId)} alt={user?.name ?? 'User'} />
             <div className="status-dot" />
           </div>
           <div className="user-info">
@@ -142,9 +149,9 @@ function Header({
   setAiText,
   parseAiTask,
   aiStatus,
-  onAddTaskClick,
   onlineUsers,
   currentUser,
+  selectedAvatarId,
   inboxOpen,
   setInboxOpen,
   inboxEntries,
@@ -211,7 +218,7 @@ function Header({
         </div>
         <div className="swift-live-stack" title={`${onlineUsers.length + (currentUser?._id ? 1 : 0)} live`}>
           {[currentUser, ...onlineUsers.map((user) => ({ _id: user.userId, name: user.name }))].filter(Boolean).slice(0, 4).map((user) => (
-            <img key={user._id} src={avatarFor(user._id)} alt={user.name} />
+            <img key={user._id} src={avatarFor(user._id, user._id === currentUser?._id ? selectedAvatarId : null)} alt={user.name} />
           ))}
         </div>
         <button className="theme-toggle-btn" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }))} title="Undo">
@@ -247,10 +254,6 @@ function Header({
         <button className="action-btn" onClick={createBoard}>
           <Plus size={16} />
           <span>New Board</span>
-        </button>
-        <button className="action-btn" onClick={onAddTaskClick}>
-          <Plus size={16} />
-          <span>Add Task</span>
         </button>
       </div>
     </header>
@@ -551,6 +554,7 @@ export function SwiftWorkspace() {
   const onlineUsers = useSelector((state) => state.presence.onlineUsers)
   const activity = useSelector((state) => state.activity.entries.filter((entry) => entry.boardId === state.board.currentBoardId).slice(0, 6))
   const [theme, setTheme] = useState(() => localStorage.getItem('flowboard:theme') || 'light')
+  const [selectedAvatarId, setSelectedAvatarId] = useState(() => localStorage.getItem('flowboard:avatar') || avatarOptions[0].id)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('board')
   const [viewMode, setViewMode] = useState('board')
@@ -574,6 +578,10 @@ export function SwiftWorkspace() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('flowboard:theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem('flowboard:avatar', selectedAvatarId)
+  }, [selectedAvatarId])
 
   useEffect(() => {
     if (!boardsOpen || !token) return
@@ -646,7 +654,7 @@ export function SwiftWorkspace() {
       assigneeIds: task.assigneeIds,
       assignees: task.assigneeIds.map((id) => {
         const user = usersById.get(id)
-        return { id, name: user?.name ?? 'Teammate', avatar: avatarFor(id) }
+        return { id, name: user?.name ?? 'Teammate', avatar: avatarFor(id, id === currentUser?._id ? selectedAvatarId : null) }
       }),
     }
   })
@@ -994,7 +1002,7 @@ export function SwiftWorkspace() {
               const canRemove = board?.ownerId === currentUser?._id && !isCurrent
               return (
               <div key={member._id} className="dashboard-card member-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'default' }}>
-                <img src={avatarFor(member._id)} alt={member.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+                <img src={avatarFor(member._id, member._id === currentUser?._id ? selectedAvatarId : null)} alt={member.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
                 <div style={{ flex: 1 }}>
                   <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{member.name}</h4>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
@@ -1020,6 +1028,16 @@ export function SwiftWorkspace() {
         <div className="dashboard-card" style={{ padding: '24px', cursor: 'default' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>Project Settings</h3>
           <p style={{ marginTop: '12px', color: 'var(--text-secondary)', fontSize: '13px' }}>MongoDB sync, Groq AI, and realtime presence are active for this workspace.</p>
+          <div className="avatar-picker">
+            <span>Choose profile avatar</span>
+            <div>
+              {avatarOptions.map((avatar) => (
+                <button key={avatar.id} className={selectedAvatarId === avatar.id ? 'selected' : ''} onClick={() => setSelectedAvatarId(avatar.id)} title={avatar.id}>
+                  <img src={avatarFor(currentUser?._id, avatar.id)} alt={avatar.id} />
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -1027,7 +1045,7 @@ export function SwiftWorkspace() {
 
   return (
     <div className="app-container">
-      <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} activeTab={activeTab} setActiveTab={setActiveTab} user={currentUser} onLogout={() => dispatch(userActions.logout())} />
+      <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} activeTab={activeTab} setActiveTab={setActiveTab} user={currentUser} selectedAvatarId={selectedAvatarId} onLogout={() => dispatch(userActions.logout())} />
       <main className="main-content">
         <Header
           board={board}
@@ -1047,9 +1065,9 @@ export function SwiftWorkspace() {
           setAiText={setAiText}
           parseAiTask={parseAiTask}
           aiStatus={aiStatus}
-          onAddTaskClick={() => openNewTask()}
           onlineUsers={onlineUsers}
           currentUser={currentUser}
+          selectedAvatarId={selectedAvatarId}
           inboxOpen={inboxOpen}
           setInboxOpen={setInboxOpen}
           inboxEntries={[...inboxEntries, ...activity]}

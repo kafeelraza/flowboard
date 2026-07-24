@@ -1855,3 +1855,105 @@ body {
     width: 210px;
   }
 }
+
+/* Board/header containment fixes */
+.app-container {
+  max-width: 100vw;
+}
+
+.main-content,
+.header,
+.header-left,
+.header-title-row,
+.header-right,
+.board-container,
+.cards-container {
+  min-width: 0;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.header-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-right {
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.search-container {
+  width: min(220px, 18vw);
+}
+
+.ai-quick-add {
+  width: min(300px, 24vw);
+}
+
+.board-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overscroll-behavior-x: contain;
+}
+
+.kanban-column {
+  width: 300px;
+  min-width: 300px;
+  max-width: 300px;
+}
+
+.kanban-card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.card-title,
+.card-description {
+  overflow-wrap: anywhere;
+}
+
+.avatar-picker {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.avatar-picker > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.avatar-picker > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.avatar-picker button {
+  width: 56px;
+  height: 56px;
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  background: var(--bg-tertiary);
+}
+
+.avatar-picker button.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-light);
+}
+
+.avatar-picker img {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+}
