@@ -325,8 +325,9 @@ io.on('connection', (socket) => {
 await connectMongo()
 
 if (!process.env.VERCEL) {
-  server.listen(4000, () => {
-    console.log('FlowBoard API and socket server running at http://127.0.0.1:4000')
+  const port = process.env.PORT || 4000
+  server.listen(port, () => {
+    console.log(`FlowBoard API and socket server running on port ${port}`)
     if (!process.env.GROQ_API_KEY) {
       console.log('GROQ_API_KEY not set - AI endpoints will use heuristic fallback instead of real Groq calls.')
     }
