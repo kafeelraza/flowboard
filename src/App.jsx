@@ -1,14 +1,8 @@
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard.jsx'
 import { AuthGate } from './components/Auth/AuthGate.jsx'
-import { BoardCanvas } from './components/Board/BoardCanvas.jsx'
-import { DashboardSidebar } from './components/Layout/DashboardSidebar.jsx'
-import { WorkspacePanel } from './components/Layout/WorkspacePanel.jsx'
-import { SidePanel } from './components/SidePanel/SidePanel.jsx'
-import { TaskModal } from './components/TaskModal/TaskModal.jsx'
-import { TopBar } from './components/TopBar/TopBar.jsx'
+import { SwiftWorkspace } from './components/Swift/SwiftWorkspace.jsx'
 import { taskActions } from './store/taskSlice.js'
 import { markUndoable } from './store/actionCreators.js'
 import { boardActions } from './store/boardSlice.js'
@@ -18,9 +12,6 @@ import { uiActions } from './store/uiSlice.js'
 
 export default function App() {
   const dispatch = useDispatch()
-  const selectedTaskId = useSelector((state) => state.ui.selectedTaskId)
-  const activeView = useSelector((state) => state.ui.activeView)
-  const isSidePanelOpen = useSelector((state) => state.ui.isSidePanelOpen)
   const isAuthenticated = useSelector((state) => state.user.isAuthenticated)
   const token = useSelector((state) => state.user.token)
   const currentUser = useSelector((state) => state.user.currentUser)
@@ -204,16 +195,7 @@ export default function App() {
           </div>
         </main>
       ) : (
-      <main className={`app-shell ${isSidePanelOpen ? 'panel-open' : ''}`}>
-        <TopBar />
-        <section className="workspace">
-          <DashboardSidebar />
-          {activeView === 'analytics' ? <AnalyticsDashboard /> : activeView === 'workspace' ? <WorkspacePanel /> : <BoardCanvas />}
-          <SidePanel />
-        </section>
-
-        {selectedTaskId && <TaskModal taskId={selectedTaskId} />}
-      </main>
+      <SwiftWorkspace />
       )}
     </DndContext>
   )
