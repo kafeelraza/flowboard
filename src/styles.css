@@ -47,6 +47,35 @@ button:disabled {
   background: #f5f7fb;
 }
 
+.app-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: #f8fafc;
+}
+
+.app-loading div {
+  display: grid;
+  gap: 6px;
+  min-width: 240px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(23, 32, 51, 0.1);
+}
+
+.app-loading strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.app-loading span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .topbar {
   position: sticky;
   top: 0;

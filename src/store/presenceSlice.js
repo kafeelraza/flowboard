@@ -1,11 +1,10 @@
 import { createSlice } from '@reduxjs/toolkit'
-import { collaborators } from '../data/seed.js'
 
 const presenceSlice = createSlice({
   name: 'presence',
   initialState: {
-    onlineUsers: collaborators,
-    editingMap: { 'task-history': 'u-ana' },
+    onlineUsers: [],
+    editingMap: {},
   },
   reducers: {
     presenceUpdated: (state, action) => {

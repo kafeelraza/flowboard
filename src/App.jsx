@@ -1,5 +1,5 @@
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard.jsx'
 import { AuthGate } from './components/Auth/AuthGate.jsx'
@@ -12,7 +12,7 @@ import { TopBar } from './components/TopBar/TopBar.jsx'
 import { taskActions } from './store/taskSlice.js'
 import { markUndoable } from './store/actionCreators.js'
 import { boardActions } from './store/boardSlice.js'
-import { flushOfflineQueue, lastLocalWriteAt, loadLocalSnapshot, rememberRemoteSnapshot } from './store/middleware/persistMiddleware.js'
+import { clearLocalSnapshot, flushOfflineQueue, lastLocalWriteAt, loadLocalSnapshot, rememberRemoteSnapshot } from './store/middleware/persistMiddleware.js'
 import { presenceActions } from './store/presenceSlice.js'
 import { uiActions } from './store/uiSlice.js'
 
@@ -26,20 +26,43 @@ export default function App() {
   const currentUser = useSelector((state) => state.user.currentUser)
   const currentBoardId = useSelector((state) => state.board.currentBoardId)
   const lastAppliedRemoteAt = useRef(0)
+  const [isHydrating, setIsHydrating] = useState(true)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) {
+      setIsHydrating(false)
+      return
+    }
+    setIsHydrating(true)
     const hydrate = async () => {
       const local = loadLocalSnapshot()
-      if (local?.board && local?.tasks) {
-        dispatch(boardActions.hydrateBoardState(local.board))
-        dispatch(taskActions.hydrateTasksState(local.tasks))
-      }
 
       try {
-        const state = local?.board?.currentBoardId ? local.board : null
-        const boardId = state?.currentBoardId ?? 'board-flow'
+        const boardsResponse = await fetch('/api/boards', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        const boards = await boardsResponse.json()
+        const localBoardId = local?.board?.currentBoardId
+        const localBoardStillExists = Boolean(localBoardId && boards.some((board) => board.boardId === localBoardId))
+        const boardId = localBoardStillExists ? localBoardId : boards?.[0]?.boardId
+
+        if (localBoardId && !localBoardStillExists) {
+          clearLocalSnapshot()
+        }
+
+        if (!boardId) {
+          clearLocalSnapshot()
+          dispatch({ ...boardActions.clearBoards(), meta: { skipPersist: true } })
+          dispatch({ ...taskActions.clearTasks(), meta: { skipPersist: true } })
+          return
+        }
+
+        if (localBoardStillExists && local?.board && local?.tasks) {
+          dispatch(boardActions.hydrateBoardState(local.board))
+          dispatch(taskActions.hydrateTasksState(local.tasks))
+        }
+
         const response = await fetch(`/api/boards/${boardId}/state`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         })
@@ -50,10 +73,6 @@ export default function App() {
           dispatch({ ...boardActions.hydrateBoardState(remote.board), meta: { skipPersist: true } })
           dispatch({ ...taskActions.hydrateTasksState(remote.tasks), meta: { skipPersist: true } })
         } else {
-          const boardsResponse = await fetch('/api/boards', {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          })
-          const boards = await boardsResponse.json()
           const nextBoardId = boards?.[0]?.boardId
           if (nextBoardId) {
             const nextResponse = await fetch(`/api/boards/${nextBoardId}/state`, {
@@ -71,6 +90,8 @@ export default function App() {
         }
       } catch {
         // Local snapshot already keeps the app usable offline.
+      } finally {
+        setIsHydrating(false)
       }
     }
 
@@ -175,6 +196,13 @@ export default function App() {
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       {!isAuthenticated ? (
         <AuthGate />
+      ) : isHydrating ? (
+        <main className="app-loading">
+          <div>
+            <strong>FlowBoard</strong>
+            <span>Loading your workspace...</span>
+          </div>
+        </main>
       ) : (
       <main className={`app-shell ${isSidePanelOpen ? 'panel-open' : ''}`}>
         <TopBar />
