@@ -29,6 +29,7 @@ const memory = {
   users: new Map(),
   snapshots: new Map(),
   activity: [],
+  chatMessages: [],
 }
 
 const visiblePresenceForBoard = (boardId) => {
@@ -85,9 +86,22 @@ const activitySchema = new mongoose.Schema(
   { timestamps: true },
 )
 
+const chatMessageSchema = new mongoose.Schema(
+  {
+    boardId: { type: String, index: true },
+    userId: String,
+    userName: String,
+    userEmail: String,
+    text: String,
+    timestamp: Number,
+  },
+  { timestamps: true },
+)
+
 const User = mongoose.models.User || mongoose.model('User', userSchema)
 const BoardSnapshot = mongoose.models.BoardSnapshot || mongoose.model('BoardSnapshot', boardSnapshotSchema)
 const Activity = mongoose.models.Activity || mongoose.model('Activity', activitySchema)
+const ChatMessage = mongoose.models.ChatMessage || mongoose.model('ChatMessage', chatMessageSchema)
 
 async function connectMongo() {
   if (!process.env.MONGO_URI) return
@@ -122,6 +136,19 @@ function snapshotMemberIds(snapshot) {
 function canAccessSnapshot(snapshot, userId) {
   if (!snapshot?.ownerId || !userId) return true
   return snapshotMemberIds(snapshot).includes(String(userId))
+}
+
+async function requireBoardAccess(boardId, userId) {
+  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (!snapshot) return { error: { status: 404, message: 'Board not found' } }
+  let normalized = snapshot
+  if (userId && canAccessSnapshot(normalized, userId)) {
+    normalized = await normalizeSnapshotOwnership(normalized, userId)
+  }
+  if (userId && !canAccessSnapshot(normalized, userId)) {
+    return { error: { status: 403, message: 'You do not have access to this board' } }
+  }
+  return { snapshot: normalized }
 }
 
 function isLegacyUserId(userId) {
@@ -429,6 +456,51 @@ app.post('/api/boards/:boardId/activity', async (req, res) => {
   if (mongoReady) await Activity.create(entry)
   else memory.activity.unshift(entry)
   res.json({ ok: true })
+})
+
+app.get('/api/boards/:boardId/chat', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId } = req.params
+  const { error } = await requireBoardAccess(boardId, req.auth.sub)
+  if (error) return res.status(error.status).json({ error: error.message })
+
+  if (mongoReady) {
+    const messages = await ChatMessage.find({ boardId }).sort({ timestamp: -1 }).limit(80)
+    return res.json(messages.reverse())
+  }
+  res.json(memory.chatMessages.filter((message) => message.boardId === boardId).slice(-80))
+})
+
+app.post('/api/boards/:boardId/chat', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId } = req.params
+  const text = String(req.body.text ?? '').trim()
+  if (!text) return res.status(400).json({ error: 'Message text is required' })
+
+  const { error } = await requireBoardAccess(boardId, req.auth.sub)
+  if (error) return res.status(error.status).json({ error: error.message })
+
+  const message = {
+    boardId,
+    userId: req.auth.sub,
+    userName: req.body.userName ?? req.auth.email ?? 'Teammate',
+    userEmail: req.auth.email,
+    text: text.slice(0, 1200),
+    timestamp: Date.now(),
+  }
+
+  let saved
+  if (mongoReady) {
+    saved = await ChatMessage.create(message)
+  } else {
+    saved = { _id: `chat-${Date.now()}`, ...message }
+    memory.chatMessages.push(saved)
+    memory.chatMessages = memory.chatMessages.slice(-500)
+  }
+
+  const publicMessage = saved.toObject?.() ?? saved
+  io.to(boardId).emit('chat:message', publicMessage)
+  res.json(publicMessage)
 })
 
 app.post('/api/ai/breakdown', async (req, res) => {

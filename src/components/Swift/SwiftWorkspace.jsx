@@ -16,12 +16,14 @@ import {
   ListFilter,
   LogOut,
   Mail,
+  MessageCircle,
   Moon,
   MoreHorizontal,
   Plus,
   RotateCcw,
   RotateCw,
   Search,
+  Send,
   Settings,
   Sparkles,
   Sun,
@@ -152,6 +154,9 @@ function Header({
   selectedAvatarId,
   boardMembers,
   openMembers,
+  chatOpen,
+  setChatOpen,
+  chatUnread,
   inboxOpen,
   setInboxOpen,
   inboxEntries,
@@ -239,6 +244,10 @@ function Header({
             <img key={user._id} src={avatarFor(user._id, user._id === currentUser?._id ? selectedAvatarId : null)} alt={user.name} />
           ))}
           {boardMembers.length > 2 && <span>+{boardMembers.length - 2}</span>}
+        </button>
+        <button className={`theme-toggle-btn chat-toggle ${chatOpen ? 'active' : ''}`} onClick={() => setChatOpen((value) => !value)} title="Board chat">
+          <MessageCircle size={18} />
+          {chatUnread > 0 && <span className="swift-dot">{chatUnread > 9 ? '9+' : chatUnread}</span>}
         </button>
         <button className="theme-toggle-btn" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }))} title="Undo">
           <RotateCcw size={18} />
@@ -748,6 +757,63 @@ function AiTaskModal({
   )
 }
 
+function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, messages, draft, setDraft, onSend }) {
+  const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    if (isOpen) messagesEndRef.current?.scrollIntoView({ block: 'end' })
+  }, [isOpen, messages])
+
+  if (!isOpen) return null
+
+  return (
+    <aside className="chat-panel">
+      <div className="chat-header">
+        <div>
+          <span>Board Chat</span>
+          <strong>{board?.title ?? 'FlowBoard'}</strong>
+        </div>
+        <button className="modal-close-btn" onClick={onClose}>
+          <X size={18} />
+        </button>
+      </div>
+      <div className="chat-messages">
+        {messages.length === 0 ? (
+          <div className="chat-empty">
+            <MessageCircle size={30} />
+            <strong>No messages yet</strong>
+            <span>Start a quick board conversation with your teammates.</span>
+          </div>
+        ) : (
+          messages.map((message) => {
+            const isMine = String(message.userId) === String(currentUser?._id)
+            return (
+              <div key={message._id ?? `${message.userId}-${message.timestamp}`} className={`chat-message ${isMine ? 'mine' : ''}`}>
+                {!isMine && <img src={avatarFor(message.userId)} alt={message.userName} />}
+                <div>
+                  <small>
+                    {isMine ? 'You' : message.userName ?? 'Teammate'}
+                    <span>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </small>
+                  <p>{message.text}</p>
+                </div>
+                {isMine && <img src={avatarFor(currentUser?._id, selectedAvatarId)} alt={currentUser?.name ?? 'You'} />}
+              </div>
+            )
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      <form className="chat-compose" onSubmit={onSend}>
+        <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message this board..." />
+        <button disabled={!draft.trim()}>
+          <Send size={16} />
+        </button>
+      </form>
+    </aside>
+  )
+}
+
 export function SwiftWorkspace() {
   const dispatch = useDispatch()
   const board = useSelector(selectBoard)
@@ -767,6 +833,10 @@ export function SwiftWorkspace() {
   const [searchQuery, setSearchQuery] = useState('')
   const [boardsOpen, setBoardsOpen] = useState(false)
   const [boards, setBoards] = useState([])
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatDraft, setChatDraft] = useState('')
+  const [chatUnread, setChatUnread] = useState(0)
   const [inboxOpen, setInboxOpen] = useState(false)
   const [inboxEntries, setInboxEntries] = useState([])
   const [aiText, setAiText] = useState('')
@@ -806,6 +876,41 @@ export function SwiftWorkspace() {
   useEffect(() => {
     setAiTargetBoardId(currentBoardId)
   }, [currentBoardId])
+
+  useEffect(() => {
+    setChatMessages([])
+    setChatUnread(0)
+    setChatOpen(false)
+  }, [currentBoardId])
+
+  useEffect(() => {
+    if (!currentBoardId || !token || !chatOpen) return
+    fetch(`/api/boards/${currentBoardId}/chat`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => response.json())
+      .then((messages) => {
+        setChatMessages(Array.isArray(messages) ? messages : [])
+        setChatUnread(0)
+      })
+      .catch(() => setChatMessages([]))
+  }, [chatOpen, currentBoardId, token])
+
+  useEffect(() => {
+    const handleChatMessage = (event) => {
+      const message = event.detail
+      if (!message || message.boardId !== currentBoardId) return
+      setChatMessages((items) => {
+        const messageId = message._id?.toString?.() ?? message._id
+        if (messageId && items.some((item) => String(item._id) === String(messageId))) return items
+        return [...items, message].slice(-120)
+      })
+      if (!chatOpen) setChatUnread((count) => Math.min(count + 1, 99))
+    }
+
+    window.addEventListener('flowboard:chat-message', handleChatMessage)
+    return () => window.removeEventListener('flowboard:chat-message', handleChatMessage)
+  }, [chatOpen, currentBoardId])
 
   useEffect(() => {
     if (!token || !inboxOpen) return
@@ -1087,6 +1192,32 @@ export function SwiftWorkspace() {
     }
     dispatch(boardActions.setBoardMembers({ boardId: currentBoardId, members: result.members }))
     setBoardMembers((members) => members.filter((member) => member._id !== userId))
+  }
+
+  const sendChatMessage = async (event) => {
+    event.preventDefault()
+    const text = chatDraft.trim()
+    if (!text || !currentBoardId) return
+    setChatDraft('')
+    try {
+      const response = await fetch(`/api/boards/${currentBoardId}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text, userName: currentUser?.name }),
+      })
+      const message = await response.json()
+      if (!response.ok) throw new Error(message.error ?? 'Message failed')
+      setChatMessages((items) => {
+        if (items.some((item) => String(item._id) === String(message._id))) return items
+        return [...items, message].slice(-120)
+      })
+    } catch (error) {
+      setChatDraft(text)
+      window.alert(error.message)
+    }
   }
 
   const openTask = (task) => {
@@ -1420,12 +1551,26 @@ export function SwiftWorkspace() {
           selectedAvatarId={selectedAvatarId}
           boardMembers={boardMembers}
           openMembers={() => setActiveTab('members')}
+          chatOpen={chatOpen}
+          setChatOpen={setChatOpen}
+          chatUnread={chatUnread}
           inboxOpen={inboxOpen}
           setInboxOpen={setInboxOpen}
           inboxEntries={[...inboxEntries, ...activity]}
         />
         {renderContent()}
       </main>
+      <ChatPanel
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        board={board}
+        currentUser={currentUser}
+        selectedAvatarId={selectedAvatarId}
+        messages={chatMessages}
+        draft={chatDraft}
+        setDraft={setChatDraft}
+        onSend={sendChatMessage}
+      />
       <CardModal isOpen={isModalOpen} onClose={closeModal} task={modalTask} columnId={modalColumnId ?? columns[0]?.id} onSave={saveTask} onDelete={deleteTask} currentUser={currentUser} />
       <BoardNameModal isOpen={isBoardModalOpen} title={newBoardTitle} setTitle={setNewBoardTitle} onClose={() => setIsBoardModalOpen(false)} onCreate={confirmCreateBoard} />
       <AiTaskModal

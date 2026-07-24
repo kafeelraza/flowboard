@@ -75,6 +75,10 @@ export const createSocketMiddleware = () => (store) => {
         : presenceActions.stoppedEditingTask({ taskId })
       store.dispatch({ ...action, meta: { fromRemote: true } })
     })
+
+    socket.on('chat:message', (message) => {
+      window.dispatchEvent(new CustomEvent('flowboard:chat-message', { detail: message }))
+    })
   }
 
   return (next) => (action) => {
