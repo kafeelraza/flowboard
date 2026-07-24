@@ -95,7 +95,7 @@ function Sidebar({ collapsed, setCollapsed, activeTab, setActiveTab, user, selec
         <div className="logo-container">
           <Zap size={20} fill="currentColor" />
         </div>
-        <span className="logo-text">Swift</span>
+        <span className="logo-text">FlowBoard</span>
       </div>
 
       <nav className="sidebar-nav">

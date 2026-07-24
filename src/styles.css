@@ -1476,6 +1476,35 @@ body {
   box-shadow: 0 0 0 4px var(--accent-light);
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 46px;
+}
+
+.password-field button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.password-field button:hover {
+  background: var(--bg-secondary);
+  color: var(--accent);
+}
+
 .toolbar-button.primary,
 .save-btn {
   display: flex;

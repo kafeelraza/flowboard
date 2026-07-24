@@ -1,4 +1,4 @@
-import { KanbanSquare, LogIn, Sparkles, UserPlus } from 'lucide-react'
+import { Eye, EyeOff, KanbanSquare, LogIn, Sparkles, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { userActions } from '../../store/userSlice.js'
@@ -8,10 +8,11 @@ export function AuthGate() {
   const status = useSelector((state) => state.user.authStatus)
   const error = useSelector((state) => state.user.authError)
   const [mode, setMode] = useState('login')
+  const [showPassword, setShowPassword] = useState(false)
   const [form, setForm] = useState({
-    name: 'Kafee',
-    email: 'kafee@example.com',
-    password: 'password123',
+    name: '',
+    email: '',
+    password: '',
   })
 
   const submit = async (event) => {
@@ -59,12 +60,18 @@ export function AuthGate() {
           </label>
           <label>
             Password
-            <input
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm({ ...form, password: event.target.value })}
-              minLength={6}
-            />
+            <div className="password-field">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={(event) => setForm({ ...form, password: event.target.value })}
+                minLength={6}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+              <button type="button" onClick={() => setShowPassword((value) => !value)} title={showPassword ? 'Hide password' : 'Show password'}>
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
           </label>
           {error && <p className="auth-error">{error}</p>}
           <button className="toolbar-button primary" disabled={status === 'loading'}>
