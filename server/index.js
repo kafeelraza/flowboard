@@ -21,6 +21,7 @@ const io = new Server(server, {
 })
 
 const boardPresence = new Map()
+const boardEditing = new Map()
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
 const JWT_SECRET = process.env.JWT_SECRET || 'flowboard-local-dev-secret'
 let mongoReady = false
@@ -42,6 +43,12 @@ const visiblePresenceForBoard = (boardId) => {
 
 const emitPresenceForBoard = (boardId) => {
   io.to(boardId).emit('presence:update', visiblePresenceForBoard(boardId))
+}
+
+const emitEditingForSocket = (socket, boardId) => {
+  for (const [taskId, userId] of boardEditing.get(boardId)?.entries() ?? []) {
+    socket.emit('presence:editing', { taskId, userId, isEditing: true })
+  }
 }
 
 const userSchema = new mongoose.Schema(
@@ -479,8 +486,19 @@ io.on('connection', (socket) => {
   const leaveActiveBoard = () => {
     if (!activeBoardId || !activeUser) return
     const boardId = activeBoardId
+    const userId = activeUser.userId
     const users = (boardPresence.get(boardId) ?? []).filter((user) => user.socketId !== socket.id)
     boardPresence.set(boardId, users)
+    const editing = boardEditing.get(boardId)
+    if (editing) {
+      for (const [taskId, editingUserId] of editing.entries()) {
+        if (editingUserId === userId) {
+          editing.delete(taskId)
+          socket.to(boardId).emit('presence:editing', { taskId, userId, isEditing: false })
+        }
+      }
+      if (editing.size === 0) boardEditing.delete(boardId)
+    }
     socket.leave(boardId)
     activeBoardId = null
     activeUser = null
@@ -498,6 +516,7 @@ io.on('connection', (socket) => {
     const users = boardPresence.get(boardId) ?? []
     boardPresence.set(boardId, [...users.filter((item) => item.socketId !== socket.id), activeUser])
     emitPresenceForBoard(boardId)
+    emitEditingForSocket(socket, boardId)
   })
 
   socket.on('board:leave', leaveActiveBoard)
@@ -518,11 +537,18 @@ io.on('connection', (socket) => {
 
   socket.on('presence:editing:start', ({ boardId, taskId }) => {
     if (!activeUser) return
+    if (!boardEditing.has(boardId)) boardEditing.set(boardId, new Map())
+    boardEditing.get(boardId).set(taskId, activeUser.userId)
     socket.to(boardId).emit('presence:editing', { taskId, userId: activeUser.userId, isEditing: true })
   })
 
   socket.on('presence:editing:stop', ({ boardId, taskId }) => {
     if (!activeUser) return
+    const editing = boardEditing.get(boardId)
+    if (editing?.get(taskId) === activeUser.userId) {
+      editing.delete(taskId)
+      if (editing.size === 0) boardEditing.delete(boardId)
+    }
     socket.to(boardId).emit('presence:editing', { taskId, userId: activeUser.userId, isEditing: false })
   })
 

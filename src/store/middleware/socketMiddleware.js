@@ -7,6 +7,21 @@ export const createSocketMiddleware = () => (store) => {
   let joinedBoardId = null
   let joinedUserId = null
 
+  const emitLocalEditingState = () => {
+    if (!socket?.connected || !joinedBoardId) return
+    const state = store.getState()
+    const currentUserId = state.user.currentUser?._id
+    if (!currentUserId) return
+    Object.entries(state.presence.editingMap)
+      .filter(([, userId]) => userId === currentUserId)
+      .forEach(([taskId]) => {
+        socket.emit('presence:editing:start', {
+          boardId: joinedBoardId,
+          taskId,
+        })
+      })
+  }
+
   const joinCurrentBoard = () => {
     if (!socket?.connected) return
     const state = store.getState()
@@ -18,15 +33,14 @@ export const createSocketMiddleware = () => (store) => {
     socket.emit('board:join', { boardId, user })
     joinedBoardId = boardId
     joinedUserId = user._id
+    emitLocalEditingState()
   }
 
-  const realtimeEnabled =
-    import.meta.env.DEV ||
-    import.meta.env.VITE_ENABLE_REALTIME === 'true' ||
-    Boolean(import.meta.env.VITE_REALTIME_URL)
+  const realtimeUrl = import.meta.env.VITE_REALTIME_URL || (import.meta.env.PROD ? 'https://flowboard-realtime-api.onrender.com' : '/')
+  const realtimeEnabled = import.meta.env.PROD || import.meta.env.VITE_ENABLE_REALTIME !== 'false'
 
   if (typeof window !== 'undefined' && realtimeEnabled) {
-    socket = io(import.meta.env.VITE_REALTIME_URL || '/', {
+    socket = io(realtimeUrl, {
       autoConnect: true,
       reconnectionDelay: 500,
       timeout: 5000,
