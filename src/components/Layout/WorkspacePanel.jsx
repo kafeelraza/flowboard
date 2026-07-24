@@ -199,6 +199,10 @@ export function WorkspacePanel() {
             </form>
           )}
           {!canInviteToBoard && <p className="empty-text">Open a board before inviting collaborators.</p>}
+          <div className="members-summary">
+            <strong>Board members ({boardMembers.length || users.length})</strong>
+            <span>Invite a registered user by email to share this board.</span>
+          </div>
           {membersStatus === 'loading' && <p className="empty-text">Loading collaborators...</p>}
           {boardMembers.map((member) => {
             const liveUser = users.find((user) => user.userId === member._id)
@@ -207,9 +211,8 @@ export function WorkspacePanel() {
                 <Avatar name={member.name} color={member.avatarColor} size={30} />
                 <div>
                   <strong>{member.name}</strong>
-                  <span>
-                    {member.email} - {member.role} - {liveUser ? 'Live' : 'Offline'}
-                  </span>
+                  <span>{member.email}</span>
+                  <small>{member.role} · {liveUser ? 'Live now' : 'Offline'}</small>
                 </div>
                 {isBoardOwner && member._id !== currentUser?._id && (
                   <button className="text-danger-button" onClick={() => removeCollaborator(member._id)}>

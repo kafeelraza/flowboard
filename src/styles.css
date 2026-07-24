@@ -639,6 +639,23 @@ button:disabled {
   color: var(--danger);
 }
 
+.members-summary {
+  display: grid;
+  gap: 3px;
+  padding: 8px 0 2px;
+}
+
+.members-summary strong {
+  font-size: 13px;
+}
+
+.members-summary span,
+.collaborator-row small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .workspace-list button,
 .workspace-list > div,
 .collaborator-row {
