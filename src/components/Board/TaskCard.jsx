@@ -45,6 +45,7 @@ function TaskCardComponent({ task }, forwardedRef) {
   }
 
   const completed = task.subtasks.filter((subtask) => subtask.done).length
+  const progress = task.subtasks.length ? Math.round((completed / task.subtasks.length) * 100) : 0
   const assignees = task.assigneeIds.map((id) => users.find((user) => user.userId === id)).filter(Boolean)
   const isAiAssisted = task.labels.some((label) => label.text.toLowerCase().includes('ai'))
   const dragStyle = prefersReducedMotion
@@ -93,6 +94,18 @@ function TaskCardComponent({ task }, forwardedRef) {
             </span>
           ))}
         </div>
+        {task.description && <p className="card-description">{task.description}</p>}
+        {task.subtasks.length > 0 && (
+          <div className="card-progress-container">
+            <div className="card-progress-header">
+              <span>Checklist</span>
+              <strong>{progress}%</strong>
+            </div>
+            <div className="card-progress-track">
+              <span style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        )}
         <div className="card-meta">
           {task.subtasks.length > 0 ? (
             <span>
