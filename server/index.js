@@ -102,6 +102,16 @@ function canAccessSnapshot(snapshot, userId) {
   return snapshotMemberIds(snapshot).includes(String(userId))
 }
 
+async function publicUsersByIds(userIds) {
+  const ids = [...new Set(userIds.filter(Boolean).map(String))]
+  if (ids.length === 0) return []
+  if (mongoReady) {
+    const users = await User.find({ _id: { $in: ids } })
+    return users.map(publicUser)
+  }
+  return [...memory.users.values()].filter((user) => ids.includes(String(user._id))).map(publicUser)
+}
+
 function authOptional(req, _res, next) {
   const header = req.headers.authorization
   if (!header?.startsWith('Bearer ')) return next()
@@ -253,6 +263,42 @@ app.post('/api/boards/:boardId/invite', async (req, res) => {
   }
 
   res.json({ ok: true, invitedUser, members })
+})
+
+app.get('/api/boards/:boardId/members', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId } = req.params
+  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (!canAccessSnapshot(snapshot, req.auth.sub)) return res.status(403).json({ error: 'You do not have access to this board' })
+
+  const members = await publicUsersByIds(snapshotMemberIds(snapshot))
+  res.json({
+    ownerId: snapshot.ownerId,
+    members: members.map((user) => ({ ...user, role: String(user._id) === String(snapshot.ownerId) ? 'Owner' : 'Collaborator' })),
+  })
+})
+
+app.delete('/api/boards/:boardId/members/:userId', async (req, res) => {
+  if (!req.auth?.sub) return res.status(401).json({ error: 'Login required' })
+  const { boardId, userId } = req.params
+  const snapshot = mongoReady ? await BoardSnapshot.findOne({ boardId }) : memory.snapshots.get(boardId)
+  if (!snapshot) return res.status(404).json({ error: 'Board not found' })
+  if (String(snapshot.ownerId) !== String(req.auth.sub)) return res.status(403).json({ error: 'Only the owner can remove collaborators' })
+  if (String(snapshot.ownerId) === String(userId)) return res.status(400).json({ error: 'Owner cannot be removed' })
+
+  const members = snapshotMemberIds(snapshot).filter((id) => id !== String(userId))
+  const state = snapshot.state
+  const board = state?.board?.boardsById?.[boardId]
+  if (board) board.members = members
+
+  if (mongoReady) {
+    await BoardSnapshot.findOneAndUpdate({ boardId }, { members, state }, { new: true })
+  } else {
+    memory.snapshots.set(boardId, { ...snapshot, members, state })
+  }
+
+  res.json({ ok: true, members })
 })
 
 app.get('/api/boards/:boardId/activity', async (req, res) => {

@@ -1,5 +1,5 @@
 import { Bell, CalendarDays, HelpCircle, Inbox, Layers, Settings, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { uiActions } from '../../store/uiSlice.js'
 import { Avatar } from '../common/Avatar.jsx'
@@ -59,6 +59,8 @@ export function WorkspacePanel() {
   const token = useSelector((state) => state.user.token)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteStatus, setInviteStatus] = useState(null)
+  const [boardMembers, setBoardMembers] = useState([])
+  const [membersStatus, setMembersStatus] = useState('idle')
   const config = viewConfig[activeSidebarItem] ?? viewConfig.Inbox
   const Icon = config.icon
   const dueTasks = tasks
@@ -67,7 +69,35 @@ export function WorkspacePanel() {
     .slice(0, 8)
   const labels = [...new Map(tasks.flatMap((task) => task.labels).map((label) => [label.text, label])).values()]
   const highPriorityCount = tasks.filter((task) => task.priority === 'high').length
+  const isBoardOwner = board?.ownerId === currentUser?._id
   const canInviteToBoard = Boolean(currentUser?._id && board)
+
+  useEffect(() => {
+    if (activeSidebarItem !== 'Collaborators' || !currentBoardId || !token) return
+    let cancelled = false
+
+    const loadMembers = async () => {
+      setMembersStatus('loading')
+      try {
+        const response = await fetch(`/api/boards/${currentBoardId}/members`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error ?? 'Could not load collaborators')
+        if (!cancelled) {
+          setBoardMembers(result.members ?? [])
+          setMembersStatus('ready')
+        }
+      } catch {
+        if (!cancelled) setMembersStatus('failed')
+      }
+    }
+
+    loadMembers()
+    return () => {
+      cancelled = true
+    }
+  }, [activeSidebarItem, currentBoardId, token])
 
   const handleAction = () => {
     if (config.tab) {
@@ -96,7 +126,28 @@ export function WorkspacePanel() {
       if (!response.ok) throw new Error(result.error ?? 'Invite failed')
       setInviteEmail('')
       setInviteStatus({ type: 'success', text: `${result.invitedUser.email} can now open this board.` })
+      setBoardMembers((members) => {
+        if (members.some((member) => member._id === result.invitedUser._id)) return members
+        return [...members, { ...result.invitedUser, role: 'Collaborator' }]
+      })
     } catch (error) {
+      setInviteStatus({ type: 'error', text: error.message })
+    }
+  }
+
+  const removeCollaborator = async (userId) => {
+    setMembersStatus('loading')
+    try {
+      const response = await fetch(`/api/boards/${currentBoardId}/members/${userId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? 'Could not remove collaborator')
+      setBoardMembers((members) => members.filter((member) => member._id !== userId))
+      setMembersStatus('ready')
+    } catch (error) {
+      setMembersStatus('failed')
       setInviteStatus({ type: 'error', text: error.message })
     }
   }
@@ -148,7 +199,27 @@ export function WorkspacePanel() {
             </form>
           )}
           {!canInviteToBoard && <p className="empty-text">Open a board before inviting collaborators.</p>}
-          {users.map((user) => (
+          {membersStatus === 'loading' && <p className="empty-text">Loading collaborators...</p>}
+          {boardMembers.map((member) => {
+            const liveUser = users.find((user) => user.userId === member._id)
+            return (
+              <div key={member._id} className="collaborator-row">
+                <Avatar name={member.name} color={member.avatarColor} size={30} />
+                <div>
+                  <strong>{member.name}</strong>
+                  <span>
+                    {member.email} - {member.role} - {liveUser ? 'Live' : 'Offline'}
+                  </span>
+                </div>
+                {isBoardOwner && member._id !== currentUser?._id && (
+                  <button className="text-danger-button" onClick={() => removeCollaborator(member._id)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          {boardMembers.length === 0 && membersStatus !== 'loading' && users.map((user) => (
             <div key={user.userId} className="collaborator-row">
               <Avatar name={user.name} color={user.avatarColor} size={30} />
               <div>
