@@ -30,6 +30,20 @@ const memory = {
   activity: [],
 }
 
+const visiblePresenceForBoard = (boardId) => {
+  const usersById = new Map()
+  for (const user of boardPresence.get(boardId) ?? []) {
+    const visibleUser = { ...user }
+    delete visibleUser.socketId
+    usersById.set(user.userId, visibleUser)
+  }
+  return [...usersById.values()]
+}
+
+const emitPresenceForBoard = (boardId) => {
+  io.to(boardId).emit('presence:update', visiblePresenceForBoard(boardId))
+}
+
 const userSchema = new mongoose.Schema(
   {
     name: String,
@@ -462,23 +476,31 @@ io.on('connection', (socket) => {
   let activeBoardId = null
   let activeUser = null
 
+  const leaveActiveBoard = () => {
+    if (!activeBoardId || !activeUser) return
+    const boardId = activeBoardId
+    const users = (boardPresence.get(boardId) ?? []).filter((user) => user.socketId !== socket.id)
+    boardPresence.set(boardId, users)
+    socket.leave(boardId)
+    activeBoardId = null
+    activeUser = null
+    emitPresenceForBoard(boardId)
+  }
+
   socket.on('board:join', ({ boardId, user }) => {
     if (!boardId || !user?._id) return
-    if (activeBoardId && activeBoardId !== boardId && activeUser) {
-      socket.leave(activeBoardId)
-      const previousUsers = (boardPresence.get(activeBoardId) ?? []).filter((item) => item.userId !== activeUser.userId)
-      boardPresence.set(activeBoardId, previousUsers)
-      io.to(activeBoardId).emit('presence:update', previousUsers)
-    }
+    if (activeBoardId) leaveActiveBoard()
 
     activeBoardId = boardId
-    activeUser = { ...user, userId: user._id, cursor: null }
+    activeUser = { ...user, userId: user._id, socketId: socket.id, cursor: null }
     socket.join(boardId)
 
     const users = boardPresence.get(boardId) ?? []
-    boardPresence.set(boardId, [...users.filter((item) => item.userId !== activeUser.userId), activeUser])
-    io.to(boardId).emit('presence:update', boardPresence.get(boardId))
+    boardPresence.set(boardId, [...users.filter((item) => item.socketId !== socket.id), activeUser])
+    emitPresenceForBoard(boardId)
   })
+
+  socket.on('board:leave', leaveActiveBoard)
 
   socket.on('board:action', ({ boardId, action, user }) => {
     socket.to(boardId).emit('board:action', { action, user })
@@ -505,10 +527,7 @@ io.on('connection', (socket) => {
   })
 
   socket.on('disconnect', () => {
-    if (!activeBoardId || !activeUser) return
-    const users = (boardPresence.get(activeBoardId) ?? []).filter((user) => user.userId !== activeUser.userId)
-    boardPresence.set(activeBoardId, users)
-    io.to(activeBoardId).emit('presence:update', users)
+    leaveActiveBoard()
   })
 })
 

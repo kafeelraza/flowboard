@@ -64,6 +64,13 @@ export const createSocketMiddleware = () => (store) => {
   }
 
   return (next) => (action) => {
+    if (action.type === 'user/logout' && socket?.connected && joinedBoardId && joinedUserId) {
+      socket.emit('board:leave')
+      joinedBoardId = null
+      joinedUserId = null
+      store.dispatch(presenceActions.presenceUpdated([]))
+    }
+
     const result = next(action)
     const shouldJoinAfterAction = [
       'user/authSucceeded',
