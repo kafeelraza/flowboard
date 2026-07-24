@@ -879,7 +879,7 @@ export function SwiftWorkspace() {
         const user = usersById.get(id)
         return { id, name: user?.name ?? 'Teammate', avatar: avatarFor(id, id === currentUser?._id ? selectedAvatarId : null) }
       }),
-      editingUser: editingMap[task._id] && editingMap[task._id] !== currentUser?._id ? usersById.get(editingMap[task._id]) : null,
+      editingUser: editingMap[task._id] ? usersById.get(editingMap[task._id]) ?? currentUser : null,
     }
   })
 
