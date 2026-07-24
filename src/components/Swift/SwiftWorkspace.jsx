@@ -52,6 +52,8 @@ const avatarOptions = [
   { id: 'gem', emoji: '💎', colors: ['#06b6d4', '#6366f1'] },
 ]
 
+const chatReactions = ['\uD83D\uDC4D', '\u2764\uFE0F', '\uD83D\uDD25', '\u2705']
+
 const categoryColors = {
   design: '#a855f7',
   dev: '#0ea5e9',
@@ -759,15 +761,37 @@ function AiTaskModal({
 
 function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, messages, draft, setDraft, onSend, onTyping, onReact, onEdit, onDelete, typingUsers, readState }) {
   const messagesEndRef = useRef(null)
+  const [contextMenu, setContextMenu] = useState(null)
+  const [reactionPickerId, setReactionPickerId] = useState(null)
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ block: 'end' })
   }, [isOpen, messages])
 
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const closeFloatingMenus = () => {
+      setContextMenu(null)
+      setReactionPickerId(null)
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') closeFloatingMenus()
+    }
+
+    window.addEventListener('click', closeFloatingMenus)
+    window.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      window.removeEventListener('click', closeFloatingMenus)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   return (
-    <aside className="chat-panel">
+    <aside className="chat-panel" onContextMenu={(event) => event.stopPropagation()}>
       <div className="chat-header">
         <div>
           <span>Board Chat</span>
@@ -787,10 +811,29 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
         ) : (
           messages.map((message) => {
             const isMine = String(message.userId) === String(currentUser?._id)
+            const messageKey = message._id ?? `${message.userId}-${message.timestamp}`
+            const reactionCounts = chatReactions
+              .map((emoji) => ({
+                emoji,
+                count: (message.reactions ?? []).filter((reaction) => reaction.emoji === emoji).length,
+              }))
+              .filter((reaction) => reaction.count > 0)
             return (
-              <div key={message._id ?? `${message.userId}-${message.timestamp}`} className={`chat-message ${isMine ? 'mine' : ''}`}>
+              <div key={messageKey} className={`chat-message ${isMine ? 'mine' : ''}`}>
                 {!isMine && <img src={avatarFor(message.userId)} alt={message.userName} />}
-                <div>
+                <div
+                  onContextMenu={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setReactionPickerId(null)
+                    setContextMenu({
+                      x: Math.min(event.clientX, window.innerWidth - 188),
+                      y: Math.min(event.clientY, window.innerHeight - (isMine ? 112 : 64)),
+                      message,
+                      isMine,
+                    })
+                  }}
+                >
                   <small>
                     {isMine ? 'You' : message.userName ?? 'Teammate'}
                     <span>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -798,7 +841,46 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
                   </small>
                   <p>{message.deletedAt ? 'This message was deleted.' : message.text}</p>
                   {!message.deletedAt && (
-                    <div className="chat-message-actions">
+                    <>
+                    <button
+                      className="chat-reaction-trigger"
+                      type="button"
+                      aria-label="React to message"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setContextMenu(null)
+                        setReactionPickerId(reactionPickerId === messageKey ? null : messageKey)
+                      }}
+                    >
+                      {'\u263A'}
+                    </button>
+                    {reactionPickerId === messageKey && (
+                      <div className="chat-reaction-palette" onClick={(event) => event.stopPropagation()}>
+                        {chatReactions.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              onReact(message, emoji)
+                              setReactionPickerId(null)
+                            }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {reactionCounts.length > 0 && (
+                      <div className="chat-reaction-summary">
+                        {reactionCounts.map((reaction) => (
+                          <span className="chat-reaction-chip" key={reaction.emoji}>
+                            {reaction.emoji}
+                            {reaction.count > 1 ? ` ${reaction.count}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="chat-message-actions" aria-hidden="true">
                       {['👍', '❤️', '🔥', '✅'].map((emoji) => {
                         const count = (message.reactions ?? []).filter((reaction) => reaction.emoji === emoji).length
                         return (
@@ -814,6 +896,7 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
                         </>
                       )}
                     </div>
+                    </>
                   )}
                   {isMine && readState.readAt >= message.timestamp && <em>Seen</em>}
                 </div>
@@ -825,6 +908,46 @@ function ChatPanel({ isOpen, onClose, board, currentUser, selectedAvatarId, mess
         {typingUsers.length > 0 && <div className="typing-indicator">{typingUsers.map((user) => user.userName).join(', ')} typing...</div>}
         <div ref={messagesEndRef} />
       </div>
+      {contextMenu && (
+        <div
+          className="chat-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard?.writeText(contextMenu.message.text ?? '')
+              setContextMenu(null)
+            }}
+          >
+            Copy text
+          </button>
+          {contextMenu.isMine && !contextMenu.message.deletedAt && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onEdit(contextMenu.message)
+                  setContextMenu(null)
+                }}
+              >
+                Edit message
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={() => {
+                  onDelete(contextMenu.message)
+                  setContextMenu(null)
+                }}
+              >
+                Delete message
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <form className="chat-compose" onSubmit={onSend}>
         <input
           value={draft}
