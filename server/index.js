@@ -463,6 +463,14 @@ io.on('connection', (socket) => {
   let activeUser = null
 
   socket.on('board:join', ({ boardId, user }) => {
+    if (!boardId || !user?._id) return
+    if (activeBoardId && activeBoardId !== boardId && activeUser) {
+      socket.leave(activeBoardId)
+      const previousUsers = (boardPresence.get(activeBoardId) ?? []).filter((item) => item.userId !== activeUser.userId)
+      boardPresence.set(activeBoardId, previousUsers)
+      io.to(activeBoardId).emit('presence:update', previousUsers)
+    }
+
     activeBoardId = boardId
     activeUser = { ...user, userId: user._id, cursor: null }
     socket.join(boardId)
